@@ -15,6 +15,7 @@ class PhoneInput extends Component {
     this.state = {
       ...this.props,
       // Default country and calling code
+      showCountrySelection: false,
       countryName: 'IN',
       callingCode: '91',
     };
@@ -55,6 +56,7 @@ class PhoneInput extends Component {
     if (this.state.countryName === '0') {
       return <rn.View />;
     }
+    console.log('her' + this.state.showCountrySelection);
     return (
       <CountryPicker
         countryCode={this.state.countryName}
@@ -73,7 +75,12 @@ class PhoneInput extends Component {
           autoFocus: false,
           placeholder: strings('search'),
         }}
-        visible="false"
+        visible={this.state.showCountrySelection}
+        onClose={() => {
+          this.setState({
+            showCountrySelection: false,
+          });
+        }}
         styles={{
           countryName: {
             color: themes.colors.primaryFg2,
@@ -124,9 +131,17 @@ class PhoneInput extends Component {
     const self = this;
     return (
       <rn.View style={[styles.viewStyle, self.props.viewStyle]}>
-        <rn.View style={styles.firstCol}>
+        <rn.TouchableOpacity
+          activeOpacity={.5}
+          onPress={() => {
+            this.setState({
+              showCountrySelection: true,
+            });
+          }}
+          style={styles.firstCol}>
           {self.renderCountryCodePicker()}
-        </rn.View>
+          <rn.View style={styles.downArrow} />
+        </rn.TouchableOpacity>
         <rn.View style={styles.SecondCol}>
           <rn.TextInput
             style={[styles.textArea, self.props.textStyle]}
@@ -166,10 +181,11 @@ const styles = rn.StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingLeft: wp(7),
+    paddingRight: wp(3),
     borderColor: themes.colors.borderColor1,
     borderRightWidth: wp(themes.styles.common.borderWidth1),
     borderRightColor: themes.colors.borderColor1,
+    flexDirection: 'row',
   },
   textStyle: {
     fontFamily: themes.fonts.medium1,
@@ -197,5 +213,13 @@ const styles = rn.StyleSheet.create({
     alignSelf: 'center',
     textAlign: 'center',
     fontSize: wp(20),
+  },
+  downArrow: {
+    width: 0,
+    height: 0,
+    borderTopColor: 'black',
+    borderColor: themes.colors.primaryFg1,
+    marginTop: wp(6),
+    borderWidth: wp(6),
   },
 });
