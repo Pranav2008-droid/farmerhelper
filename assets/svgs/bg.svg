@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="360px" height="268px" viewBox="0 0 360 268" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>210CE487-B279-4751-8DBE-467D3F403FF8</title>
+    <defs>
+        <rect id="path-1" x="0" y="0" width="360" height="268"></rect>
+    </defs>
+    <g id="v_1.2" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="My-service">
+            <g id="bg">
+                <g id="Group-2">
+                    <mask id="mask-2" fill="white">
+                        <use xlink:href="#path-1"></use>
+                    </mask>
+                    <use id="Mask" fill="#0073B6" xlink:href="#path-1"></use>
+                    <g opacity="0.229999989" mask="url(#mask-2)">
+                        <g transform="translate(164.500000, 54.500000) scale(-1, 1) translate(-164.500000, -54.500000) translate(-44.000000, -171.000000)">
+                            <polygon id="Path-14" fill="#0099EE" opacity="0.799758185" points="0 261.5 376 451 386 68.5"></polygon>
+                            <circle id="Oval" fill="#FFFFFF" opacity="0.800000012" cx="263.75" cy="232.25" r="12.25"></circle>
+                            <polygon id="Path-15" fill="#80E8FF" opacity="0.543759301" points="21.5 0 113.5 290.5 323 9.5"></polygon>
+                            <polygon id="Path-16" fill="#BFF3FF" opacity="0.502255394" points="416.5 272.5 71 101 416.5 101"></polygon>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>
