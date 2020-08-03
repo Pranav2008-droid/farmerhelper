@@ -7,9 +7,13 @@ import {createStackNavigator} from '@react-navigation/stack';
 
 const Stack = createStackNavigator();
 
-function MyStack() {
+function ScreenStack() {
   return (
-    <Stack.Navigator headerMode="none">
+    <Stack.Navigator
+      headerMode="none"
+      screenOptions={{
+        gestureEnabled: true,
+      }}>
       <Stack.Screen name="Login" component={LoginScrn} />
       <Stack.Screen name="OTP" component={OtpScrn} />
     </Stack.Navigator>
@@ -18,6 +22,6 @@ function MyStack() {
 
 export default class App extends React.Component {
   render() {
-    return <NavigationContainer>{<MyStack />}</NavigationContainer>;
+    return <NavigationContainer>{<ScreenStack />}</NavigationContainer>;
   }
 }
