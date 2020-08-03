@@ -4,7 +4,7 @@ export default {
   primaryFg2: 'black',
   primaryBrightBlue: '#0073b6',
   primaryDisabled: 'gray',
-  primaryDisabledLight: 'lightgray', 
+  primaryDisabledLight: 'lightgray',
   borderColor1: 'lightgray',
   borderColor2: 'rgba(151,151,151,0.5)',
 

@@ -1,9 +1,7 @@
 import React, {Component} from 'react';
 import * as rn from 'react-native';
 import * as nb from 'native-base';
-import CountryPicker, {
-  getAllCountries,
-} from 'react-native-country-picker-modal';
+import CountryPicker from 'react-native-country-picker-modal';
 import * as themes from '../../themes';
 import {strings} from '../../i18n';
 import * as Validator from '../validation';
@@ -30,11 +28,10 @@ class PhoneInput extends Component {
     this.setState({callingCode, countryName});
   }
   onChangePhoneNumber(phoneNumber) {
-    const self = this;
-    self.props.onChangePhoneNo(
-      self.state.callingCode,
+    this.props.onChangePhoneNo(
+      this.state.callingCode,
       phoneNumber,
-      self.isValidPhoneNumber(self.state.callingCode, phoneNumber),
+      this.isValidPhoneNumber(this.state.callingCode, phoneNumber),
     );
   }
   isValidPhoneNumber(callingCode, phoneNumber) {
@@ -128,32 +125,31 @@ class PhoneInput extends Component {
   }
 
   renderPhoneNumberView() {
-    const self = this;
     return (
-      <rn.View style={[styles.viewStyle, self.props.viewStyle]}>
+      <rn.View style={[styles.viewStyle, this.props.viewStyle]}>
         <rn.TouchableOpacity
-          activeOpacity={.5}
+          activeOpacity={0.5}
           onPress={() => {
             this.setState({
               showCountrySelection: true,
             });
           }}
           style={styles.firstCol}>
-          {self.renderCountryCodePicker()}
+          {this.renderCountryCodePicker()}
           <rn.View style={styles.downArrow} />
         </rn.TouchableOpacity>
         <rn.View style={styles.SecondCol}>
           <rn.TextInput
-            style={[styles.textArea, self.props.textStyle]}
-            disabled={self.props.disableCountryCode}
+            style={[styles.textArea, this.props.textStyle]}
+            disabled={this.props.disableCountryCode}
             autoCorrect={false}
             keyboardType="numeric"
             maxLength={13}
-            value={self.props.phoneNumber}
-            placeholder={self.props.placeholder}
-            onChangeText={self.onChangePhoneNumber.bind(this)}
+            value={this.props.phoneNumber}
+            placeholder={this.props.placeholder}
+            onChangeText={this.onChangePhoneNumber.bind(this)}
           />
-          {self.renderPhoneNoValidationIcon()}
+          {this.renderPhoneNoValidationIcon()}
           {this.props.children}
         </rn.View>
       </rn.View>
@@ -218,7 +214,7 @@ const styles = rn.StyleSheet.create({
     width: 0,
     height: 0,
     borderTopColor: 'black',
-    borderColor: themes.colors.primaryFg1,
+    borderColor: 'rgba(0,0,0,0)',
     marginTop: wp(6),
     borderWidth: wp(6),
   },

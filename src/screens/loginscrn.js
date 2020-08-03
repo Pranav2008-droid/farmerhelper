@@ -16,14 +16,8 @@ class LoginScrn extends Component {
       enableNextButton: false,
     };
   }
-  onPressBack() {
-    //NavigationService.goBack();
-  }
   onPressNextButton() {
-    /*NavigationService.navigate('VerifySigninScrn', {
-      callingCode: this.state.callingCode,
-      phoneNo: this.state.phoneNo
-    });*/
+    this.props.navigation.navigate('OTP');
   }
 
   onChangePhoneNo(callingCode, phoneNumber, isValid) {
@@ -40,7 +34,7 @@ class LoginScrn extends Component {
     const ratio = entireScreenWidth / ImageWidth;
     return (
       <HeaderBackground
-        style={{flex: 0.3}}
+        style={styles.headerBackgroundStyle}
         width={entireScreenWidth}
         height={ratio * ImageHeight}
       />
@@ -72,7 +66,7 @@ class LoginScrn extends Component {
           backgroundColor: this.state.enableNextButton
             ? themes.colors.primaryBrightBlue
             : themes.colors.primaryDisabled,
-         ...styles.nextButtonStyle,
+          ...styles.nextButtonStyle,
         }}>
         <nb.Icon
           name={themes.icons.arrowRight.name}
