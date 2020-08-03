@@ -1,6 +1,7 @@
 import React, {Component} from 'react';
 import * as rn from 'react-native';
 import * as nb from 'native-base';
+import Spinner from 'react-native-spinkit';
 import * as themes from '../themes';
 import {strings} from '../i18n';
 import {wp, hp} from './utils/dimension';
@@ -14,10 +15,14 @@ class LoginScrn extends Component {
     super(props);
     this.state = {
       enableNextButton: false,
+      showProgressDialog: false,
     };
   }
   onPressNextButton() {
-    this.props.navigation.navigate('OTP');
+    this.setState({
+      showProgressDialog : true,
+    })
+    // this.props.navigation.navigate('OTP');
   }
 
   onChangePhoneNo(callingCode, phoneNumber, isValid) {
@@ -38,6 +43,15 @@ class LoginScrn extends Component {
         width={entireScreenWidth}
         height={ratio * ImageHeight}
       />
+    );
+  }
+  renderProgressModal() {
+    return (
+      <rn.Modal visible={this.state.showProgressDialog} transparent>
+        <rn.View style={styles.progressModalContainer}>
+          <Spinner type="Circle" size={50} color={themes.colors.primary}/>
+        </rn.View>
+      </rn.Modal>
     );
   }
   renderContactView() {
@@ -102,6 +116,7 @@ class LoginScrn extends Component {
       <rn.View style={styles.container}>
         {this.renderHeaderBackground()}
         {this.renderContent()}
+        {this.renderProgressModal()}
       </rn.View>
     );
   }
@@ -199,5 +214,11 @@ const styles = rn.StyleSheet.create({
     position: 'absolute',
     bottom: hp(30),
     right: wp(30),
+  },
+  progressModalContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
 });
