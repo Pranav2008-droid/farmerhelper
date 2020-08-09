@@ -80,7 +80,6 @@ class OtpScrn extends Component {
               this.refs.input_4.focus();
             }
           }}
-
         />
         <rn.TextInput
           style={styles.otpinput}
@@ -94,7 +93,6 @@ class OtpScrn extends Component {
               this.refs.input_5.focus();
             }
           }}
-
         />
         <rn.TextInput
           style={styles.otpinput}
