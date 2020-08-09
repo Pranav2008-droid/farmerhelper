@@ -2,5 +2,8 @@
   "title": "Farmer Helper",
   "whatIsYourNumber": "What is your number",
   "weWillTextACodeToVerifyYourPhone": "We'll text a code to verify your phone",
-  "mobileNo": "Mobile number"
+  "mobileNo": "Mobile number",
+  "entertheotp" : "Enter the OTP",
+  "enterthecode" : "enter the code",
+
 }

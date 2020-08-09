@@ -53,7 +53,6 @@ class PhoneInput extends Component {
     if (this.state.countryName === '0') {
       return <rn.View />;
     }
-    console.log('her' + this.state.showCountrySelection);
     return (
       <CountryPicker
         countryCode={this.state.countryName}

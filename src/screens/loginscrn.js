@@ -7,7 +7,7 @@ import {strings} from '../i18n';
 import {wp, hp} from './utils/dimension';
 import {PhoneInput} from './components';
 import HeaderBackground from '../../assets/svgs/bg.svg';
-
+import {User} from '../businesslogic';
 const entireScreenWidth = rn.Dimensions.get('window').width;
 
 class LoginScrn extends Component {
@@ -17,13 +17,30 @@ class LoginScrn extends Component {
       enableNextButton: false,
       showProgressDialog: false,
     };
+    this.verifyObj = null;
   }
-  onPressNextButton() {
+  onPressNextButton = () => {
     this.setState({
-      showProgressDialog : true,
-    })
-    // this.props.navigation.navigate('OTP');
-  }
+      showProgressDialog: true,
+    });
+    var phoneNumber = '+' + this.state.callingCode + this.state.phoneNo;
+    User.signInByPhone(phoneNumber, '123456')
+      .then((verifyObj) => {
+        console.log('from loginscrn' + verifyObj);
+        this.verifyObj = verifyObj;
+        this.setState(
+          {
+            showProgressDialog: false,
+          },
+          () => {
+            this.props.navigation.navigate('OtpScrn');
+          },
+        );
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+  };
 
   onChangePhoneNo(callingCode, phoneNumber, isValid) {
     this.setState({
@@ -49,7 +66,7 @@ class LoginScrn extends Component {
     return (
       <rn.Modal visible={this.state.showProgressDialog} transparent>
         <rn.View style={styles.progressModalContainer}>
-          <Spinner type="Circle" size={50} color={themes.colors.primary}/>
+          <Spinner type="Circle" size={50} color={themes.colors.primary} />
         </rn.View>
       </rn.Modal>
     );

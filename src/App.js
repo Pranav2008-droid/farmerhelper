@@ -2,8 +2,10 @@ import 'react-native-gesture-handler';
 import React from 'react';
 import LoginScrn from './screens/loginscrn';
 import OtpScrn from './screens/otpscrn';
+import UserScreens from './screens/userscreens/index';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
+import { State } from 'react-native-gesture-handler';
 
 const Stack = createStackNavigator();
 
@@ -14,8 +16,9 @@ function ScreenStack() {
       screenOptions={{
         gestureEnabled: true,
       }}>
-      <Stack.Screen name="Login" component={LoginScrn} />
-      <Stack.Screen name="OTP" component={OtpScrn} />
+      <Stack.Screen name="LoginScrn" component={LoginScrn} />
+      <Stack.Screen name="OtpScrn" component={OtpScrn} />
+      <Stack.Screen name="UserScreens" component={UserScreens} />
     </Stack.Navigator>
   );
 }

@@ -1,0 +1,69 @@
+{
+  "project_info": {
+    "project_number": "187476232499",
+    "firebase_url": "https://farmerhelper-70abb.firebaseio.com",
+    "project_id": "farmerhelper-70abb",
+    "storage_bucket": "farmerhelper-70abb.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:187476232499:android:68d052d1513b3583fb5646",
+        "android_client_info": {
+          "package_name": "com.farmerhelper"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "187476232499-0eu5ujs1d1dmbob6j3ou0kd76uv5c10f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDajQj_vkKRNgRnm8a9h1iQvzbiKB72Lx0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "187476232499-0eu5ujs1d1dmbob6j3ou0kd76uv5c10f.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:187476232499:android:7b66b514c917addbfb5646",
+        "android_client_info": {
+          "package_name": "farmer.helper"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "187476232499-0eu5ujs1d1dmbob6j3ou0kd76uv5c10f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDajQj_vkKRNgRnm8a9h1iQvzbiKB72Lx0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "187476232499-0eu5ujs1d1dmbob6j3ou0kd76uv5c10f.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
