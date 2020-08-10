@@ -5,5 +5,8 @@
   "mobileNo": "Mobile number",
   "entertheotp" : "Enter the OTP",
   "enterthecode" : "enter the code",
-
+  "voltageLevel" : "Voltage Level",
+  "motorStatus" : "Motor Status: ",
+  "errUnableToSendOtp": "Unable to send OTP",
+  "errUnableToVerifyOtp": "Can not verify OTP. Ensure the OTP entered is correct"
 }

@@ -1,10 +1,23 @@
 import {UserDbApi} from '../backend';
 
 export default class User {
-  static signInByPhone(phoneNo) {
+  static signInByPhone(phoneNumber, autoVerifyCallback) {
     return new Promise((resolve, reject) => {
-      UserDbApi.signInByPhone(phoneNo)
+      UserDbApi.signInByPhone(phoneNumber, autoVerifyCallback)
         .then((user) => {
+          //TODO: Create app specific user object and return
+          resolve(user);
+        })
+        .catch((err) => {
+          reject(err);
+        });
+    });
+  }
+  static verifyCode(code) {
+    return new Promise((resolve, reject) => {
+      UserDbApi.verifyCode(code)
+        .then((user) => {
+          //TODO: Create app specific user object and return
           resolve(user);
         })
         .catch((err) => {

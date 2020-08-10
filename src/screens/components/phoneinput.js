@@ -28,7 +28,7 @@ class PhoneInput extends Component {
     this.setState({callingCode, countryName});
   }
   onChangePhoneNumber(phoneNumber) {
-    this.props.onChangePhoneNo(
+    this.props.onChangePhoneNumber(
       this.state.callingCode,
       phoneNumber,
       this.isValidPhoneNumber(this.state.callingCode, phoneNumber),
@@ -91,7 +91,7 @@ class PhoneInput extends Component {
     );
   }
 
-  renderPhoneNoValidationIcon() {
+  renderPhoneNumberValidationIcon() {
     const phoneNumber = this.props.phoneNumber;
     const callingCode = this.state.callingCode;
     let phoneNoValidationIcon = <rn.View style={styles.validationView} />;
@@ -148,7 +148,7 @@ class PhoneInput extends Component {
             placeholder={this.props.placeholder}
             onChangeText={this.onChangePhoneNumber.bind(this)}
           />
-          {this.renderPhoneNoValidationIcon()}
+          {this.renderPhoneNumberValidationIcon()}
           {this.props.children}
         </rn.View>
       </rn.View>

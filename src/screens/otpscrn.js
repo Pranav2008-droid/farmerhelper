@@ -1,11 +1,14 @@
 import React, {Component} from 'react';
 import * as rn from 'react-native';
 import * as nb from 'native-base';
+import Spinner from 'react-native-spinkit';
+import Toast from 'react-native-simple-toast';
 import * as themes from '../themes';
 import {strings} from '../i18n';
 import {wp, hp} from './utils/dimension';
 import HeaderBackground from '../../assets/svgs/bg.svg';
 import {User} from '../businesslogic';
+import OtpInput from './components/otpinput';
 
 const entireScreenWidth = rn.Dimensions.get('window').width;
 
@@ -14,14 +17,70 @@ class OtpScrn extends Component {
     super(props);
     this.state = {
       enableNextButton: true,
-      inputText: '',
+      otp: '',
+      showProgressDialog: true,
+      phoneNumber: props.route.params.phoneNumber,
     };
   }
+  componentDidMount() {
+    User.signInByPhone(
+      this.state.phoneNumber,
+      this.autoVerifyCallback.bind(this),
+    )
+      .then(() => {
+        this.setState({
+          showProgressDialog: false,
+        });
+      })
+      .catch((err) => {
+        //TODO: Handle individual errors
+        Toast.show(strings('errUnableToSendOtp'), Toast.LONG);
+        console.log(err);
+        this.setState(
+          {
+            showProgressDialog: false,
+          },
+          () => {
+            this.props.navigation.goBack();
+          },
+        );
+      });
+  }
   onPressNextButton = () => {
-    console.log('going to the next screen');
-    this.props.navigation.navigate('UserScreens');
+    this.setState({
+      showProgressDialog: true,
+    });
+    User.verifyCode(this.state.otp)
+      .then((user) => {
+        console.log(user);
+        this.navigateToHomeScreen();
+      })
+      .catch((err) => {
+        console.log(err);
+        alert(err);
+        Toast.show(strings('errUnableToVerifyOtp'), Toast.LONG);
+        this.setState({
+          showProgressDialog: false,
+        });
+      });
   };
-
+  autoVerifyCallback(user) {
+    console.log(user);
+    this.navigateToHomeScreen();
+  }
+  navigateToHomeScreen() {
+    this.setState(
+      {
+        showProgressDialog: false,
+      },
+      () => {
+        this.props.navigation.reset({
+          index: 0,
+          routes: [{name: 'UserScreens'}],
+        });
+      },
+    );
+  }
   renderHeaderBackground() {
     const ImageWidth = 360;
     const ImageHeight = 268;
@@ -34,103 +93,19 @@ class OtpScrn extends Component {
       />
     );
   }
-  renderTextView() {
-    return (
-      <rn.View
-        style={{
-          paddingLeft: wp(20),
-          paddingRight: wp(20),
-          flexDirection: 'row',
-        }}>
-        <rn.TextInput
-          style={styles.otpinput}
-          ref="input_1"
-          autoCorrect={false}
-          keyboardType="numeric"
-          maxLength={1}
-          onChangeText={(text) => {
-            this.setState({inputText: text});
-            if (text) {
-              this.refs.input_2.focus();
-            }
-          }}
-        />
-        <rn.TextInput
-          style={styles.otpinput}
-          ref="input_2"
-          autoCorrect={false}
-          keyboardType="numeric"
-          maxLength={1}
-          onChangeText={(text) => {
-            this.setState({inputText: text});
-            if (text) {
-              this.refs.input_3.focus();
-            }
-          }}
-        />
-        <rn.TextInput
-          style={styles.otpinput}
-          ref="input_3"
-          autoCorrect={false}
-          keyboardType="numeric"
-          maxLength={1}
-          onChangeText={(text) => {
-            this.setState({inputText: text});
-            if (text) {
-              this.refs.input_4.focus();
-            }
-          }}
-        />
-        <rn.TextInput
-          style={styles.otpinput}
-          ref="input_4"
-          autoCorrect={false}
-          keyboardType="numeric"
-          maxLength={1}
-          onChangeText={(text) => {
-            this.setState({inputText: text});
-            if (text) {
-              this.refs.input_5.focus();
-            }
-          }}
-        />
-        <rn.TextInput
-          style={styles.otpinput}
-          ref="input_5"
-          autoCorrect={false}
-          keyboardType="numeric"
-          maxLength={1}
-          onChangeText={(text) => {
-            this.setState({inputText: text});
-            if (text) {
-              this.refs.input_6.focus();
-            }
-          }}
-        />
-        <rn.TextInput
-          style={styles.otpinput}
-          ref="input_6"
-          autoCorrect={false}
-          keyboardType="numeric"
-          maxLength={1}
-          onChangeText={(text) => {
-            this.setState({inputText: text});
-          }}
-        />
-      </rn.View>
-    );
-  }
+
   renderButtonView() {
     return (
       <rn.TouchableOpacity
-        disabled={!this.state.enableNextButton}
+        disabled={this.state.otp.length !== 6}
         onPress={() => {
           this.onPressNextButton();
         }}
         style={{
-          backgroundColor: this.state.enableNextButton
-            ? themes.colors.primaryBrightBlue
-            : themes.colors.primaryDisabled,
+          backgroundColor:
+            this.state.otp.length === 6
+              ? themes.colors.primaryBrightBlue
+              : themes.colors.primaryDisabled,
           ...styles.nextButtonStyle,
         }}>
         <nb.Icon
@@ -149,19 +124,35 @@ class OtpScrn extends Component {
     return (
       <rn.View style={styles.contentStyle}>
         <rn.Text style={styles.textStyle}>{strings('entertheotp')}</rn.Text>
+        <OtpInput
+          onOtpChanged={(otp) => {
+            this.setState({
+              otp: otp,
+            });
+          }}
+        />
       </rn.View>
     );
   }
   renderContent() {
     return <rn.View style={styles.content}>{this.renderPageContent()}</rn.View>;
   }
+  renderProgressModal() {
+    return (
+      <rn.Modal visible={this.state.showProgressDialog} transparent>
+        <rn.View style={styles.progressModalContainer}>
+          <Spinner type="Circle" size={50} color={themes.colors.primary} />
+        </rn.View>
+      </rn.Modal>
+    );
+  }
   render() {
     return (
       <rn.View style={styles.container}>
         {this.renderHeaderBackground()}
         {this.renderContent()}
-        {this.renderTextView()}
         {this.renderButtonView()}
+        {this.renderProgressModal()}
       </rn.View>
     );
   }
@@ -217,14 +208,12 @@ const styles = rn.StyleSheet.create({
     fontFamily: themes.fonts.medium1,
     color: themes.colors.primaryFg2,
   },
-  labelStyle: {
-    marginTop: hp(8),
-    left: wp(16),
-    fontSize: wp(12),
-    fontFamily: themes.fonts.regular1,
-    color: themes.colors.primaryFg2,
+  progressModalContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
-
   nextButtonStyle: {
     borderRadius: wp(70),
     height: hp(70),

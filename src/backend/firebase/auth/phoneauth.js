@@ -2,15 +2,22 @@ import auth from '@react-native-firebase/auth';
 
 var verifyOtpObject = null;
 
-function sendOtp(phoneNo) {
+function sendOtp(phoneNumber, autoVerifyCallback) {
   return new Promise((resolve, reject) => {
     auth()
-      .signInWithPhoneNumber(phoneNo, true)
+      .signInWithPhoneNumber(phoneNumber, true)
       .then(function (result) {
         verifyOtpObject = result;
         resolve();
-        // const authState = auth().onAuthStateChanged((data) => {
-        // });
+        const unsubscribeAuthStateListener = auth().onAuthStateChanged(
+          (user) => {
+            if (user && user.phoneNumber === phoneNumber) {
+              //TODO: Convert the firebase user object format to app specific user object format
+              autoVerifyCallback(user);
+              unsubscribeAuthStateListener();
+            }
+          },
+        );
       })
       .catch(function (error) {
         console.log(error);
@@ -20,18 +27,14 @@ function sendOtp(phoneNo) {
 }
 
 function verifyOtp(code) {
-  console.log(
-    'InputJson received in phoneauth.js is ' +
-      JSON.stringify(verifyOtpObject) +
-      'and code received in phoneauth.js is ' +
-      code,
-  );
   return new Promise((resolve, reject) => {
     if (verifyOtpObject) {
       verifyOtpObject
         .confirm(code)
         .then((user) => {
+          //TODO: Convert the firebase user object format to app specific user object format
           resolve(user);
+          console.log('User login successful');
         })
         .catch((err) => {
           reject(err);

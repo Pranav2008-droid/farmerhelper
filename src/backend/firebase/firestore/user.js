@@ -1,6 +1,9 @@
-import {sendOtp} from '../auth';
+import {sendOtp, verifyOtp} from '../auth';
 export default class User {
-  static signInByPhone(phoneNo) {
-    return sendOtp(phoneNo);
+  static signInByPhone(phoneNumber, autoVerifyCallback) {
+    return sendOtp(phoneNumber, autoVerifyCallback);
+  }
+  static verifyCode(code){
+    return verifyOtp(code);
   }
 }

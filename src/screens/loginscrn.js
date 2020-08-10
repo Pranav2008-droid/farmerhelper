@@ -2,6 +2,7 @@ import React, {Component} from 'react';
 import * as rn from 'react-native';
 import * as nb from 'native-base';
 import Spinner from 'react-native-spinkit';
+import Toast from 'react-native-simple-toast';
 import * as themes from '../themes';
 import {strings} from '../i18n';
 import {wp, hp} from './utils/dimension';
@@ -15,37 +16,17 @@ class LoginScrn extends Component {
     super(props);
     this.state = {
       enableNextButton: false,
-      showProgressDialog: false,
     };
-    this.verifyObj = null;
   }
   onPressNextButton = () => {
-    this.setState({
-      showProgressDialog: true,
-    });
-    var phoneNumber = '+' + this.state.callingCode + this.state.phoneNo;
-    User.signInByPhone(phoneNumber, '123456')
-      .then((verifyObj) => {
-        console.log('from loginscrn' + verifyObj);
-        this.verifyObj = verifyObj;
-        this.setState(
-          {
-            showProgressDialog: false,
-          },
-          () => {
-            this.props.navigation.navigate('OtpScrn');
-          },
-        );
-      })
-      .catch((err) => {
-        console.log(err);
-      });
+    var phoneNumber = '+' + this.state.callingCode + this.state.phoneNumber;
+    this.props.navigation.navigate('OtpScrn', {phoneNumber: phoneNumber});
   };
 
-  onChangePhoneNo(callingCode, phoneNumber, isValid) {
+  onChangePhoneNumber(callingCode, phoneNumber, isValid) {
     this.setState({
       enableNextButton: isValid,
-      phoneNo: phoneNumber,
+      phoneNumber: phoneNumber,
       callingCode,
     });
   }
@@ -62,26 +43,17 @@ class LoginScrn extends Component {
       />
     );
   }
-  renderProgressModal() {
-    return (
-      <rn.Modal visible={this.state.showProgressDialog} transparent>
-        <rn.View style={styles.progressModalContainer}>
-          <Spinner type="Circle" size={50} color={themes.colors.primary} />
-        </rn.View>
-      </rn.Modal>
-    );
-  }
   renderContactView() {
     return (
       <rn.View style={styles.countryCodeViewStyle}>
         <PhoneInput
-          phoneNumber={this.state.phoneNo}
+          phoneNumber={this.state.phoneNumber}
           callingCode={this.state.callingCode}
           placeholder={strings('mobileNo')}
-          viewStyle={styles.PhoneNoCallCodeViewStyle}
+          viewStyle={styles.PhoneNumberCallCodeViewStyle}
           textStyle={styles.phoneNumberInputStyle}
           callCodeTextStyle={styles.callCodeTextStyle}
-          onChangePhoneNo={this.onChangePhoneNo.bind(this)}
+          onChangePhoneNumber={this.onChangePhoneNumber.bind(this)}
         />
       </rn.View>
     );
@@ -133,7 +105,6 @@ class LoginScrn extends Component {
       <rn.View style={styles.container}>
         {this.renderHeaderBackground()}
         {this.renderContent()}
-        {this.renderProgressModal()}
       </rn.View>
     );
   }
@@ -192,7 +163,7 @@ const styles = rn.StyleSheet.create({
   countryCodeViewStyle: {
     marginTop: hp(29),
   },
-  PhoneNoCallCodeViewStyle: {
+  PhoneNumberCallCodeViewStyle: {
     width: wp(328),
     height: hp(50),
     borderRadius: wp(themes.styles.common.borderRadius1),
