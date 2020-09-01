@@ -99,13 +99,18 @@ export default class MeasureScrn extends React.Component {
               style={{
                 ...styles.onButton,
                 backgroundColor:
-                  this.state.motorStatus === 'On' ? 'green' : 'gray',
+                  this.state.motorStatus === 'On'
+                    ? themes.colors.motorStatusOnbutton
+                    : themes.colors.primaryDisabled,
               }}
               onPress={this.onPressOnButton.bind(this)}>
               <rn.Text // eslint-disable-next-line react-native/no-inline-styles
                 style={{
                   ...styles.onButtonText,
-                  color: this.state.motorStatus === 'On' ? 'white' : 'darkgray',
+                  color:
+                    this.state.motorStatus === 'On'
+                      ? themes.colors.primaryFg1
+                      : themes.colors.primaryDisabledDark,
                 }}>
                 On
               </rn.Text>
@@ -116,14 +121,18 @@ export default class MeasureScrn extends React.Component {
               style={{
                 ...styles.offButton,
                 backgroundColor:
-                  this.state.motorStatus === 'Off' ? 'red' : 'gray',
+                  this.state.motorStatus === 'Off'
+                    ? themes.colors.motorStatusOffButton
+                    : themes.colors.primaryDisabled,
               }}
               onPress={this.onPressOffButton.bind(this)}>
               <rn.Text // eslint-disable-next-line react-native/no-inline-styles
                 style={{
                   ...styles.offButtonText,
                   color:
-                    this.state.motorStatus === 'Off' ? 'white' : 'darkgray',
+                    this.state.motorStatus === 'Off'
+                      ? themes.colors.primaryFg1
+                      : themes.colors.primaryDisabledDark,
                 }}>
                 Off
               </rn.Text>
@@ -151,7 +160,7 @@ const styles = rn.StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'column',
     borderRadius: 10,
-    shadowColor: 'white',
+    shadowColor: themes.colors.primaryFg1,
     shadowOffset: {
       width: 0,
       height: 3,
@@ -194,7 +203,7 @@ const styles = rn.StyleSheet.create({
     justifyContent: 'space-evenly',
     flexDirection: 'column',
     borderRadius: 10,
-    shadowColor: 'white',
+    shadowColor: themes.colors.primaryFg1,
     shadowOffset: {
       width: 0,
       height: 3,
@@ -206,7 +215,7 @@ const styles = rn.StyleSheet.create({
     flex: 0.9,
   },
   onButton: {
-    backgroundColor: 'green',
+    backgroundColor: themes.colors.motorStatusOnbutton,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 100,
@@ -219,7 +228,7 @@ const styles = rn.StyleSheet.create({
     color: themes.colors.primaryFg1,
   },
   offButton: {
-    backgroundColor: 'green',
+    backgroundColor: themes.colors.motorStatusOffButton,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 100,

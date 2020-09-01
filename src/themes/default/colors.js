@@ -5,6 +5,7 @@ export default {
   primaryBrightBlue: '#0073b6',
   primaryDisabled: 'gray',
   primaryDisabledLight: 'lightgray',
+  primaryDisabledDark: 'darkgray',
   borderColor1: 'lightgray',
   borderColor2: 'rgba(151,151,151,0.5)',
   phase3BackgroundColor: 'lightgray',
@@ -13,6 +14,8 @@ export default {
   phase2BackgroundColor: 'lightgray',
   phase1Color: 'red',
   phase1BackgroundColor: 'lightgray',
+  motorStatusOnbutton: 'green',
+  motorStatusOffButton: 'red',
 
   validationIconError: '#ad3d3c',
   validationIconSuccess: 'green',

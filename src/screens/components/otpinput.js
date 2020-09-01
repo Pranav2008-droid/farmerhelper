@@ -1,5 +1,5 @@
 import React from 'react';
-import {StyleSheet} from 'react-native';
+import {StyleSheet,View} from 'react-native';
 import {Content, Item, Input} from 'native-base';
 import {Grid, Col} from 'react-native-easy-grid';
 
