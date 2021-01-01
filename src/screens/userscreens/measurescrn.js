@@ -7,6 +7,7 @@ import {strings} from '../../i18n';
 import {wp, hp} from '../utils/dimension';
 import {Motor} from '../../businesslogic';
 import {ProgressDialog} from '../components';
+import {Status} from '../../common/types';
 
 export default class MeasureScrn extends React.Component {
   constructor() {
@@ -15,8 +16,9 @@ export default class MeasureScrn extends React.Component {
       phase1: 240,
       phase2: 210,
       phase3: 250,
-      motorStatus: {
-        state: strings('0x00000013'),
+      systemStatus: {
+        motorState: Status.NA,
+        powerState: Status.NA,
       },
       showProgressModal: true,
       progressMessage: strings('0x00000017'),
@@ -32,7 +34,7 @@ export default class MeasureScrn extends React.Component {
     this.listener = Motor.registerMotorStateListener((data) => {
       this.setState(
         {
-          motorStatus: data,
+          systemStatus: data,
           showProgressModal: false,
         },
         () => {
@@ -44,24 +46,20 @@ export default class MeasureScrn extends React.Component {
   }
   refreshLastUpdatedTime() {
     var lastUpdatedTime = strings('0x00000013');
-    if (this.state.motorStatus && this.state.motorStatus.timestamp) {
+    if (this.state.systemStatus && this.state.systemStatus.timestamp) {
       const localTime = Date.now();
       var difference = Math.floor(
-        (localTime - this.state.motorStatus.timestamp) / 1000,
+        (localTime - this.state.systemStatus.timestamp) / 1000,
       );
-      console.log(`diff = ${difference}\n`);
       if (difference >= 0) {
         if (difference < 60) {
           lastUpdatedTime = difference * 1 + ' ' + strings('0x00000014');
-          console.log(lastUpdatedTime);
         } else if (difference < 3600) {
           lastUpdatedTime =
             Math.round(difference / 60) * 1 + ' ' + strings('0x00000015');
-          console.log(lastUpdatedTime);
         } else if (difference < 86400) {
           lastUpdatedTime =
             Math.round(difference / 3600) * 1 + ' ' + strings('0x00000016');
-          console.log(lastUpdatedTime);
         }
       }
     }
@@ -85,8 +83,27 @@ export default class MeasureScrn extends React.Component {
     Motor.unregisterMotorStateListener(this.listener);
     this.stopLastUpdatedTimeRefresher();
   }
+  getStateString(state) {
+    var stringState = strings('0x00000013');
+
+    switch (state) {
+      case Status.ON:
+        stringState = strings('on');
+        break;
+      case Status.OFF:
+        stringState = strings('off');
+        break;
+      default:
+        stringState = strings('0x00000013');
+    }
+    return stringState;
+  }
   onPressOnButton() {
-    if (this.state.motorStatus.state === strings('off')) {
+    if (
+      // eslint-disable-next-line no-bitwise
+      (this.state.systemStatus.motorState === Status.OFF) &
+      (this.state.systemStatus.powerState === Status.ON)
+    ) {
       this.setState({
         showProgressModal: true,
         progressMessage: strings('0x0000000F'),
@@ -107,8 +124,9 @@ export default class MeasureScrn extends React.Component {
           console.log(err);
           this.setState(
             {
-              motorStatus: {
-                state: strings('off'),
+              systemStatus: {
+                ...this.state.systemStatus,
+                motorState: Status.OFF,
               },
               showProgressModal: false,
               progressMessage: null,
@@ -118,12 +136,14 @@ export default class MeasureScrn extends React.Component {
             },
           );
         });
-    } else {
+    } else if (this.state.systemStatus.motorState === Status.ON) {
       Toast.show(strings('motorAlreadyOn'), Toast.SHORT, Toast.CENTER);
+    } else if (this.state.systemStatus.powerState === Status.OFF) {
+      Toast.show(strings('0x00000019'), Toast.SHORT, Toast.CENTER);
     }
   }
   onPressOffButton() {
-    if (this.state.motorStatus.state === strings('on')) {
+    if (this.state.systemStatus.motorState === Status.ON) {
       this.setState({
         showProgressModal: true,
       });
@@ -143,8 +163,9 @@ export default class MeasureScrn extends React.Component {
           console.log(err);
           this.setState(
             {
-              motorStatus: {
-                state: 'on',
+              systemStatus: {
+                ...this.state.systemStatus,
+                motorState: Status.ON,
               },
               showProgressModal: false,
               progressMessage: null,
@@ -159,35 +180,44 @@ export default class MeasureScrn extends React.Component {
     }
   }
   renderMeter(value, color, backgroundColor, text) {
-    return (
-      <rn.View style={styles.circularProgressContainer}>
-        <AnimatedCircularProgress
-          animate={500}
-          size={wp(50 * this.globalSize)}
-          width={wp(7.5 * this.globalSize)}
-          backgroundWidth={wp(8.625 * this.globalSize)}
-          lineCap={'round'}
-          arcSweepAngle={240}
-          rotation={240}
-          fill={value}
-          tintColor={color}
-          duration={1000}
-          backgroundColor={backgroundColor}
-          style={styles.circularProgress}>
-          {(phase1) => (
-            <rn.Text style={styles.centerText}>{text + 'v'}</rn.Text>
-          )}
-        </AnimatedCircularProgress>
-      </rn.View>
-    );
+    // return (
+    //   <rn.View style={styles.circularProgressContainer}>
+    //     <AnimatedCircularProgress
+    //       animate={500}
+    //       size={wp(50 * this.globalSize)}
+    //       width={wp(7.5 * this.globalSize)}
+    //       backgroundWidth={wp(8.625 * this.globalSize)}
+    //       lineCap={'round'}
+    //       arcSweepAngle={240}
+    //       rotation={240}
+    //       fill={value}
+    //       tintColor={color}
+    //       duration={1000}
+    //       backgroundColor={backgroundColor}
+    //       style={styles.circularProgress}>
+    //       {(phase1) => (
+    //         <rn.Text style={styles.centerText}>{text + 'v'}</rn.Text>
+    //       )}
+    //     </AnimatedCircularProgress>
+    //   </rn.View>
+    // );
   }
   render() {
     return (
       <rn.View style={styles.container}>
         <rn.View style={styles.topView}>
           <rn.View style={styles.voltageTextView}>
-            <rn.Text style={styles.textStyle}>
-              {strings('voltageLevel')}
+            <rn.Text style={styles.textStyle}>{strings('0x00000018')}</rn.Text>
+            <rn.Text
+              // eslint-disable-next-line react-native/no-inline-styles
+              style={{
+                ...styles.textStyle,
+                color:
+                  this.state.systemStatus.powerState === Status.ON
+                    ? 'green'
+                    : 'red',
+              }}>
+              {this.state.systemStatus.powerState}
             </rn.Text>
           </rn.View>
           <rn.View style={styles.voltageMeterView}>
@@ -215,7 +245,8 @@ export default class MeasureScrn extends React.Component {
         <rn.View style={styles.bottomView}>
           <rn.View style={styles.motorTextView}>
             <rn.Text style={styles.motorStatusText}>
-              {strings('motorStatus') + this.state.motorStatus.state}
+              {strings('motorStatus') +
+                this.getStateString(this.state.systemStatus.motorState)}
             </rn.Text>
             <rn.Text style={styles.motorUpdatedText}>
               {strings('0x00000012') + this.state.lastUpdatedTime}
@@ -230,7 +261,9 @@ export default class MeasureScrn extends React.Component {
                 backgroundColor: themes.colors.motorStatusOnbutton,
               }}
               onPress={this.onPressOnButton.bind(this)}>
-              <rn.Text style={styles.onButtonText}>{strings('on')}</rn.Text>
+              <rn.Text style={styles.onButtonText}>
+                {strings('onLabel')}
+              </rn.Text>
             </rn.TouchableOpacity>
             <rn.TouchableOpacity
               activeOpacity={0}
@@ -245,7 +278,7 @@ export default class MeasureScrn extends React.Component {
                   ...styles.offButtonText,
                   color: themes.colors.primaryFg1,
                 }}>
-                {strings('off')}
+                {strings('offLabel')}
               </rn.Text>
             </rn.TouchableOpacity>
           </rn.View>

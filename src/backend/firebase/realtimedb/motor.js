@@ -60,7 +60,7 @@ export default class MotorApi {
     if (!motorStateListener) {
       return;
     }
-    const dbRef = database().ref('/MotorStatus');
+    const dbRef = database().ref('/systemStatus');
     return dbRef.on('value', (snapshot) => {
       if (snapshot.val()) {
         motorStateListener(snapshot.val());
@@ -69,7 +69,7 @@ export default class MotorApi {
   }
   static unregisterMotorStateListener(motorStateListenerObj) {
     if (motorStateListenerObj) {
-      const dbRef = database().ref('/MotorStatus');
+      const dbRef = database().ref('/systemStatus');
       dbRef.off('value', motorStateListenerObj);
     }
   }
@@ -86,8 +86,8 @@ export default class MotorApi {
   }
   static getRealtimeData() {
     return new Promise((resolve, reject) => {
-      const motorRef = database().ref('/MotorStatus');
-      motorRef
+      const systemRef = database().ref('/systemStatus');
+      systemRef
         .once('value')
         .then((data) => {
           resolve(data.val());
