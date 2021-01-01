@@ -22,4 +22,5 @@ export default {
   buttons: {
     borderColor: 'lightgray',
   },
+  progressIndicator: '#0073B6',
 };

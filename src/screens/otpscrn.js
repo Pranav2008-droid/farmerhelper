@@ -72,9 +72,6 @@ class OtpScrn extends Component {
         showProgressDialog: false,
       },
       () => {
-        User.returnUserDetails().then((userDetails) => {
-          console.log(userDetails);
-        });
         this.props.navigation.reset({
           index: 0,
           routes: [{name: 'UserScreens'}],

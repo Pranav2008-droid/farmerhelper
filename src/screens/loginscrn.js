@@ -1,11 +1,11 @@
 import React, {Component} from 'react';
 import * as rn from 'react-native';
 import * as nb from 'native-base';
-import Spinner from 'react-native-spinkit';
-import Toast from 'react-native-simple-toast';
 import * as themes from '../themes';
 import {strings} from '../i18n';
 import {wp, hp} from './utils/dimension';
+import Spinner from 'react-native-spinkit';
+import Toast from 'react-native-simple-toast';
 import {PhoneInput} from './components';
 import HeaderBackground from '../../assets/svgs/bg.svg';
 import {User} from '../businesslogic';

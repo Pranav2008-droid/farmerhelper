@@ -16,9 +16,9 @@ function ScreenStack() {
       screenOptions={{
         gestureEnabled: true,
       }}>
+      <Stack.Screen name="UserScreens" component={UserScreens} />
       <Stack.Screen name="LoginScrn" component={LoginScrn} />
       <Stack.Screen name="OtpScrn" component={OtpScrn} />
-      <Stack.Screen name="UserScreens" component={UserScreens} />
     </Stack.Navigator>
   );
 }

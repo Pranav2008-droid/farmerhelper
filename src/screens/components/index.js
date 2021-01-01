@@ -1,3 +1,4 @@
 import PhoneInput from './phoneinput';
+import ProgressDialog from './progressdialog';
 
-export {PhoneInput};
+export {PhoneInput, ProgressDialog};

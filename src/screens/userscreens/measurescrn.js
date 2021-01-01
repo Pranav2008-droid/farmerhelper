@@ -1,37 +1,161 @@
 import React from 'react';
 import * as rn from 'react-native';
+import Toast from 'react-native-simple-toast';
+import {AnimatedCircularProgress} from 'react-native-circular-progress';
 import * as themes from '../../themes';
 import {strings} from '../../i18n';
 import {wp, hp} from '../utils/dimension';
-import {AnimatedCircularProgress} from 'react-native-circular-progress';
+import {Motor} from '../../businesslogic';
+import {ProgressDialog} from '../components';
 
 export default class MeasureScrn extends React.Component {
   constructor() {
     super();
-    //TODO: Read the live status from firebase
     this.state = {
       phase1: 240,
       phase2: 210,
       phase3: 250,
-      motorStatus: 'On',
+      motorStatus: {
+        state: strings('0x00000013'),
+      },
+      showProgressModal: true,
+      progressMessage: strings('0x00000017'),
+      lastUpdatedTime: null,
     };
     this.globalSize = 1.8;
     this.maxVoltage = 440;
+    this.listener = null;
+    this.lastUpdatedTimeRefresher = null;
+    this.refreshLastUpdatedTime = this.refreshLastUpdatedTime.bind(this);
+  }
+  componentDidMount() {
+    this.listener = Motor.registerMotorStateListener((data) => {
+      this.setState(
+        {
+          motorStatus: data,
+          showProgressModal: false,
+        },
+        () => {
+          this.refreshLastUpdatedTime();
+        },
+      );
+    });
+    this.startLastUpdatedTimeRefresher();
+  }
+  refreshLastUpdatedTime() {
+    var lastUpdatedTime = strings('0x00000013');
+    if (this.state.motorStatus && this.state.motorStatus.timestamp) {
+      const localTime = Date.now();
+      var difference = Math.floor(
+        (localTime - this.state.motorStatus.timestamp) / 1000,
+      );
+      console.log(`diff = ${difference}\n`);
+      if (difference >= 0) {
+        if (difference < 60) {
+          lastUpdatedTime = difference * 1 + ' ' + strings('0x00000014');
+          console.log(lastUpdatedTime);
+        } else if (difference < 3600) {
+          lastUpdatedTime =
+            Math.round(difference / 60) * 1 + ' ' + strings('0x00000015');
+          console.log(lastUpdatedTime);
+        } else if (difference < 86400) {
+          lastUpdatedTime =
+            Math.round(difference / 3600) * 1 + ' ' + strings('0x00000016');
+          console.log(lastUpdatedTime);
+        }
+      }
+    }
+    this.setState({
+      lastUpdatedTime: lastUpdatedTime,
+    });
+  }
+  startLastUpdatedTimeRefresher() {
+    this.refreshLastUpdatedTime();
+    this.lastUpdatedTimeRefresher = setInterval(
+      this.refreshLastUpdatedTime.bind(this),
+      10000,
+    );
+  }
+  stopLastUpdatedTimeRefresher() {
+    if (this.lastUpdatedTimeRefresher) {
+      clearTimeout(this.lastUpdatedTimeRefresher);
+    }
+  }
+  componentWillUnmount() {
+    Motor.unregisterMotorStateListener(this.listener);
+    this.stopLastUpdatedTimeRefresher();
   }
   onPressOnButton() {
-    if (this.state.motorStatus === 'Off') {
-      //TODO: Send on operation to motor through firebase
+    if (this.state.motorStatus.state === strings('off')) {
       this.setState({
-        motorStatus: 'On',
+        showProgressModal: true,
+        progressMessage: strings('0x0000000F'),
       });
+      Motor.turnOn()
+        .then(() => {
+          this.setState(
+            {
+              showProgressModal: false,
+              progressMessage: null,
+            },
+            () => {
+              Toast.show(strings('0x00000011'), Toast.SHORT, Toast.CENTER);
+            },
+          );
+        })
+        .catch((err) => {
+          console.log(err);
+          this.setState(
+            {
+              motorStatus: {
+                state: strings('off'),
+              },
+              showProgressModal: false,
+              progressMessage: null,
+            },
+            () => {
+              Toast.show(strings('0x00000010'), Toast.SHORT, Toast.CENTER);
+            },
+          );
+        });
+    } else {
+      Toast.show(strings('motorAlreadyOn'), Toast.SHORT, Toast.CENTER);
     }
   }
   onPressOffButton() {
-    if (this.state.motorStatus === 'On') {
-      //TODO: Send off operation to motor through firebase
+    if (this.state.motorStatus.state === strings('on')) {
       this.setState({
-        motorStatus: 'Off',
+        showProgressModal: true,
       });
+      Motor.turnOff()
+        .then(() => {
+          this.setState(
+            {
+              showProgressModal: false,
+              progressMessage: null,
+            },
+            () => {
+              Toast.show(strings('0x00000011'), Toast.SHORT, Toast.CENTER);
+            },
+          );
+        })
+        .catch((err) => {
+          console.log(err);
+          this.setState(
+            {
+              motorStatus: {
+                state: 'on',
+              },
+              showProgressModal: false,
+              progressMessage: null,
+            },
+            () => {
+              Toast.show(strings('0x00000010'), Toast.SHORT, Toast.CENTER);
+            },
+          );
+        });
+    } else {
+      Toast.show(strings('motorAlreadyOff'), Toast.SHORT, Toast.CENTER);
     }
   }
   renderMeter(value, color, backgroundColor, text) {
@@ -89,56 +213,47 @@ export default class MeasureScrn extends React.Component {
         </rn.View>
 
         <rn.View style={styles.bottomView}>
-          <rn.Text style={styles.motorStatusText}>
-            {strings('motorStatus') + this.state.motorStatus}
-          </rn.Text>
+          <rn.View style={styles.motorTextView}>
+            <rn.Text style={styles.motorStatusText}>
+              {strings('motorStatus') + this.state.motorStatus.state}
+            </rn.Text>
+            <rn.Text style={styles.motorUpdatedText}>
+              {strings('0x00000012') + this.state.lastUpdatedTime}
+            </rn.Text>
+          </rn.View>
           <rn.View style={styles.motorStatusButtonView}>
             <rn.TouchableOpacity
-              activeOpacity={1}
+              activeOpacity={0}
               // eslint-disable-next-line react-native/no-inline-styles
               style={{
                 ...styles.onButton,
-                backgroundColor:
-                  this.state.motorStatus === 'On'
-                    ? themes.colors.motorStatusOnbutton
-                    : themes.colors.primaryDisabled,
+                backgroundColor: themes.colors.motorStatusOnbutton,
               }}
               onPress={this.onPressOnButton.bind(this)}>
-              <rn.Text // eslint-disable-next-line react-native/no-inline-styles
-                style={{
-                  ...styles.onButtonText,
-                  color:
-                    this.state.motorStatus === 'On'
-                      ? themes.colors.primaryFg1
-                      : themes.colors.primaryDisabledDark,
-                }}>
-                On
-              </rn.Text>
+              <rn.Text style={styles.onButtonText}>{strings('on')}</rn.Text>
             </rn.TouchableOpacity>
             <rn.TouchableOpacity
-              activeOpacity={1}
+              activeOpacity={0}
               // eslint-disable-next-line react-native/no-inline-styles
               style={{
                 ...styles.offButton,
-                backgroundColor:
-                  this.state.motorStatus === 'Off'
-                    ? themes.colors.motorStatusOffButton
-                    : themes.colors.primaryDisabled,
+                backgroundColor: themes.colors.motorStatusOffButton,
               }}
               onPress={this.onPressOffButton.bind(this)}>
               <rn.Text // eslint-disable-next-line react-native/no-inline-styles
                 style={{
                   ...styles.offButtonText,
-                  color:
-                    this.state.motorStatus === 'Off'
-                      ? themes.colors.primaryFg1
-                      : themes.colors.primaryDisabledDark,
+                  color: themes.colors.primaryFg1,
                 }}>
-                Off
+                {strings('off')}
               </rn.Text>
             </rn.TouchableOpacity>
           </rn.View>
         </rn.View>
+        <ProgressDialog
+          isVisible={this.state.showProgressModal}
+          message={this.state.progressMessage}
+        />
       </rn.View>
     );
   }
@@ -198,6 +313,11 @@ const styles = rn.StyleSheet.create({
     fontFamily: themes.fonts.medium1,
     color: themes.colors.primaryFg2,
   },
+  motorUpdatedText: {
+    fontSize: wp(12),
+    fontFamily: themes.fonts.medium1,
+    color: themes.colors.primaryFg2,
+  },
   bottomView: {
     alignItems: 'center',
     justifyContent: 'space-evenly',
@@ -213,6 +333,9 @@ const styles = rn.StyleSheet.create({
     elevation: 10,
     marginBottom: wp(10),
     flex: 0.9,
+  },
+  motorTextView: {
+    alignItems: 'center',
   },
   onButton: {
     backgroundColor: themes.colors.motorStatusOnbutton,
