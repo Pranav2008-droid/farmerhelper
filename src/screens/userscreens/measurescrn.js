@@ -7,7 +7,9 @@ import {strings} from '../../i18n';
 import {wp, hp} from '../utils/dimension';
 import {Motor} from '../../businesslogic';
 import {ProgressDialog} from '../components';
-import {Status} from '../../common/types';
+
+var Types = require('../../common/types');
+var Status = Types.Status;
 
 export default class MeasureScrn extends React.Component {
   constructor() {

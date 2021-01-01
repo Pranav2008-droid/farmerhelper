@@ -3,4 +3,5 @@ const Status = {
   OFF: 'off',
   NA: 'na',
 };
-export {Status};
+
+module.exports.Status = Status;
