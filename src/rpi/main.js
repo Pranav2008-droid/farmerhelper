@@ -26,10 +26,15 @@ var realtimeDb = firebase.database();
 
 function debugLog(msg) {
   if (debug) {
-    console.log(msg);
+    var currentTime = new Date();
+    var dateString = ("0" + currentTime.getDate()).slice(-2) + "-" + 
+        ("0"+(currentTime.getMonth()+1)).slice(-2) + "-" + currentTime.getFullYear() + " " + 
+        ("0" + currentTime.getHours()).slice(-2) +":"+ ("0" + currentTime.getMinutes()).slice(-2) +
+        ":" + ("0" + currentTime.getSeconds()).slice(-2) + "." + 
+        ("00" + currentTime.getMilliseconds()).slice(-3);
+    console.log(dateString + ': ' + msg);
   }
 }
-debugLog(Status);
 function getCurrentServerTime() {
   return new Promise((resolve, reject) => {
     realtimeDb
@@ -61,6 +66,10 @@ function updateSystemStatus() {
     motorState: motorState,
     powerState: powerState,
     timestamp: firebase.database.ServerValue.TIMESTAMP,
+  }).then( () => {
+      debugLog('Status updated successfully');
+  }).catch((err) => {
+      debugLog('Updating status failed. ' + err);
   });
 }
 
@@ -86,32 +95,39 @@ function dbUpdateHandler(data) {
       debugLog('commandTimeStamp = ' + commandTimestamp);
       debugLog('localTime = ' + localTime);
       debugLog('timediff = ' + timeDiff);
-      debugLog('timeSinceCmdRequested' + timeSinceCmdRequested);
-      debugLog('snapshot.val()1 = ');
+      debugLog('timeSinceCmdRequested = ' + timeSinceCmdRequested);
       if (timeSinceCmdRequested < 1800) {
-        debugLog('Inside ');
         if (data.val() == 'prepareStart') {
-          debugLog('ready');
+          debugLog('Ready to start the motor');
           commandRef = firebase.database().ref('/command/');
           commandRef.update({
             response: 'ready',
+          }).then(() => {
+          }).catch((err) => {
+            debugLog('Error while while acknowledging ready state to start the motor.' + err);
           });
         }
         if (data.val() == 'confirmStart') {
-          debugLog('starting the motor');
+          debugLog('Starting the motor');
           turnOnMotor();
           commandRef = firebase.database().ref('/command/');
           commandRef.update({
             request: '',
+          }).then(() => {
+          }).catch((err) => {
+            debugLog('Motor started. But error while acknowledging start command.' + err);
           });
         }
         if (data.val() == 'stop') {
-          debugLog('stopping the motor');
+          debugLog('Stopping the motor');
           turnOffMotor();
           commandRef = firebase.database().ref('/command/');
           commandRef.update({
             request: '',
             response: 'stopped',
+          }).then(() => {
+          }).catch((err) => {
+            debugLog('Motor stopped. But error while acknowledging stop command.' + err);
           });
         }
       }
@@ -131,7 +147,7 @@ function turnOffMotor() {
 }
 
 getTimeDiff().then((diff) => {
-  debugLog('diff =' + diff);
+  debugLog('Localtime diff with server timestamp = ' + diff);
   var ref = firebase.database().ref('/command/request');
   ref.on('value', dbUpdateHandler);
 });
