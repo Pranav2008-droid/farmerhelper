@@ -1,154 +1,164 @@
 var Types = require('../common/types');
 var Status = Types.Status;
-var firebase = require("firebase/app");
+var firebase = require('firebase/app');
 var motor = require('./motor');
 var Gpio = require('onoff').Gpio;
-var current = new Gpio(21,'in','both')
+var current = new Gpio(21, 'in', 'both');
 var motorState = 'off';
 var powerState = 'off';
 var timeDiff = 0;
-var debug = true;;
+var debug = true;
 
-require("firebase/database");
+require('firebase/database');
 
 var firebaseConfig = {
-          apiKey: "AIzaSyBNubXY2SjdcIy5u36Cy2_hO6lhpu-mW04",
-          authDomain: "farmerhelper-70abb.firebaseapp.com",
-          databaseURL: "https://farmerhelper-70abb.firebaseio.com",
-          projectId: "farmerhelper-70abb",
-          storageBucket: "farmerhelper-70abb.appspot.com",
-          messagingSenderId: "187476232499",
-          appId: "1:187476232499:web:57c36aef8e9146bdfb5646"
-        };
+  apiKey: 'AIzaSyBNubXY2SjdcIy5u36Cy2_hO6lhpu-mW04',
+  authDomain: 'farmerhelper-70abb.firebaseapp.com',
+  databaseURL: 'https://farmerhelper-70abb.firebaseio.com',
+  projectId: 'farmerhelper-70abb',
+  storageBucket: 'farmerhelper-70abb.appspot.com',
+  messagingSenderId: '187476232499',
+  appId: '1:187476232499:web:57c36aef8e9146bdfb5646',
+};
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 var realtimeDb = firebase.database();
 
 function debugLog(msg) {
-    if (debug) {
-        console.log(msg);
-    }
+  if (debug) {
+    console.log(msg);
+  }
 }
 debugLog(Status);
 function getCurrentServerTime() {
-    return new Promise((resolve, reject) => {
-        realtimeDb.ref('/').update({
-            timestamp: firebase.database.ServerValue.TIMESTAMP
-        }).then( () => {
-            realtimeDb.ref('/timestamp').once('value').then((data) => {
-                resolve(data.val());
-            }).catch(() => {
-                resolve(Date.now());
-            });
-        }).catch( () => {
+  return new Promise((resolve, reject) => {
+    realtimeDb
+      .ref('/')
+      .update({
+        timestamp: firebase.database.ServerValue.TIMESTAMP,
+      })
+      .then(() => {
+        realtimeDb
+          .ref('/timestamp')
+          .once('value')
+          .then((data) => {
+            resolve(data.val());
+          })
+          .catch(() => {
             resolve(Date.now());
-        });;
-    });
+          });
+      })
+      .catch(() => {
+        resolve(Date.now());
+      });
+  });
 }
 
-function updateSystemStatus(){
-    debugLog('powerState = ' + powerState)
-    var ref = firebase.database().ref('/systemStatus')
-    ref.update({
-        motorState : motorState,
-        powerState : powerState,
-        timestamp : firebase.database.ServerValue.TIMESTAMP,
-    })
+function updateSystemStatus() {
+  debugLog('powerState = ' + powerState);
+  var ref = firebase.database().ref('/systemStatus');
+  ref.update({
+    motorState: motorState,
+    powerState: powerState,
+    timestamp: firebase.database.ServerValue.TIMESTAMP,
+  });
 }
 
 async function getTimeDiff() {
-    var serverTime = (await getCurrentServerTime())/1000;
-    var localCurTime = (Date.now())/1000;
-    debugLog('Server time = ' + serverTime);
-    debugLog('Local time = ' + localCurTime);
-    timeDiff = parseInt(localCurTime - serverTime);
-    return timeDiff;;
+  var serverTime = (await getCurrentServerTime()) / 1000;
+  var localCurTime = Date.now() / 1000;
+  debugLog('Server time = ' + serverTime);
+  debugLog('Local time = ' + localCurTime);
+  timeDiff = parseInt(localCurTime - serverTime);
+  return timeDiff;
 }
 
 function dbUpdateHandler(data) {
-    var localTime = Date.now();
-    debugLog('dbUpdateHandler data = ' + data.val());
-    firebase.database().ref('/command/timestamp').once("value", (timeStampData) => {
-        var commandTimestamp = parseInt(timeStampData.val());
-        var timeSinceCmdRequested = (localTime + timeDiff) - commandTimestamp;
-        debugLog("commandTimeStamp = " + commandTimestamp);
-        debugLog("localTime = " + localTime);
-        debugLog("timediff = " + timeDiff);
-        debugLog("timeSinceCmdRequested" + timeSinceCmdRequested);
-        debugLog("snapshot.val()1 = " );
-        if (timeSinceCmdRequested < 1800){
-            debugLog('Inside ');
-            if (data.val() == 'prepareStart'){
-                debugLog('ready')
-                commandRef = firebase.database().ref('/command/')
-                commandRef.update({
-                    response: 'ready'
-                })
-            }
-            if (data.val() == 'confirmStart'){
-                debugLog('starting the motor')
-                turnOnMotor()
-                commandRef = firebase.database().ref('/command/')
-                commandRef.update({
-                    request: '',
-                })
-            }
-            if (data.val() =='stop'){
-                debugLog('stopping the motor')
-                turnOffMotor()
-                commandRef = firebase.database().ref('/command/')
-                commandRef.update({
-                    request: '',
-                    response: 'stopped'
-                })
-              }
-
+  var localTime = Date.now();
+  debugLog('dbUpdateHandler data = ' + data.val());
+  firebase
+    .database()
+    .ref('/command/timestamp')
+    .once('value', (timeStampData) => {
+      var commandTimestamp = parseInt(timeStampData.val());
+      var commandRef = null;
+      var timeSinceCmdRequested = localTime + timeDiff - commandTimestamp;
+      debugLog('commandTimeStamp = ' + commandTimestamp);
+      debugLog('localTime = ' + localTime);
+      debugLog('timediff = ' + timeDiff);
+      debugLog('timeSinceCmdRequested' + timeSinceCmdRequested);
+      debugLog('snapshot.val()1 = ');
+      if (timeSinceCmdRequested < 1800) {
+        debugLog('Inside ');
+        if (data.val() == 'prepareStart') {
+          debugLog('ready');
+          commandRef = firebase.database().ref('/command/');
+          commandRef.update({
+            response: 'ready',
+          });
         }
+        if (data.val() == 'confirmStart') {
+          debugLog('starting the motor');
+          turnOnMotor();
+          commandRef = firebase.database().ref('/command/');
+          commandRef.update({
+            request: '',
+          });
+        }
+        if (data.val() == 'stop') {
+          debugLog('stopping the motor');
+          turnOffMotor();
+          commandRef = firebase.database().ref('/command/');
+          commandRef.update({
+            request: '',
+            response: 'stopped',
+          });
+        }
+      }
     });
 }
 
-function turnOnMotor(){
-    motor.turnOnMotor();
-    motorState = 'on';
-    updateSystemStatus();
+function turnOnMotor() {
+  motor.turnOnMotor();
+  motorState = 'on';
+  updateSystemStatus();
 }
 
-function turnOffMotor(){
-    motor.turnOffMotor();
-    motorState = 'off';
-    updateSystemStatus();
+function turnOffMotor() {
+  motor.turnOffMotor();
+  motorState = 'off';
+  updateSystemStatus();
 }
 
 getTimeDiff().then((diff) => {
-    debugLog('diff =' + diff);
-    ref = firebase.database().ref('/command/request')
-    ref.on('value', dbUpdateHandler)
+  debugLog('diff =' + diff);
+  var ref = firebase.database().ref('/command/request');
+  ref.on('value', dbUpdateHandler);
 });
 
 if (current.readSync() == 1) {
-    powerState = 'on';
+  powerState = 'on';
 } else {
-    powerState = 'off';
+  powerState = 'off';
 }
 updateSystemStatus();
 
-current.watch(function (err,value) {
-    if(err){
-        console.log(err)
-        return;
+current.watch(function (err, value) {
+  if (err) {
+    console.log(err);
+    return;
+  }
+  if (value === 0) {
+    powerState = 'off';
+    if (motorState === 'on') {
+      turnOffMotor();
     }
-    if (value == 0) {
-        powerState = 'off'
-        if (motorState == 'on') {
-            turnOffMotor()
-        }
-    } else if (value == 1) {
-        powerState = 'on'
-        updateSystemStatus();
-    }
-        
-})
+  } else if (value === 1) {
+    powerState = 'on';
+    updateSystemStatus();
+  }
+});
 
-setInterval(function() {
-    updateSystemStatus()
-},30000) 
+setInterval(function () {
+  updateSystemStatus();
+}, 30000);

@@ -7,6 +7,7 @@ import {strings} from '../../i18n';
 import {wp, hp} from '../utils/dimension';
 import {Motor} from '../../businesslogic';
 import {ProgressDialog} from '../components';
+import {diff} from 'react-native-reanimated';
 
 var Types = require('../../common/types');
 var Status = Types.Status;
@@ -22,7 +23,8 @@ export default class MeasureScrn extends React.Component {
         motorState: Status.NA,
         powerState: Status.NA,
       },
-      showProgressModal: true,
+      showProgressModal: false,
+      showInitialProgressModal: true,
       progressMessage: strings('0x00000017'),
       lastUpdatedTime: null,
     };
@@ -37,10 +39,12 @@ export default class MeasureScrn extends React.Component {
       this.setState(
         {
           systemStatus: data,
-          showProgressModal: false,
+          showInitialProgressModal: false,
         },
         () => {
+          this.stopLastUpdatedTimeRefresher();
           this.refreshLastUpdatedTime();
+          this.startLastUpdatedTimeRefresher();
         },
       );
     });
@@ -53,9 +57,19 @@ export default class MeasureScrn extends React.Component {
       var difference = Math.floor(
         (localTime - this.state.systemStatus.timestamp) / 1000,
       );
+      if (difference < 0) {
+        /* This scenario should never happen. But we observed that the localtime is
+        lower than this.state.systemStatus.timestamp even though we are taking 
+        localtime after this.state.systemStatus.timestamp.
+        So the difference becomes negative.
+
+        As a workaround, lets treat the negative value as zero. */
+        //TODO: Fix this problem
+        difference = 0;
+      }
       if (difference >= 0) {
         if (difference < 60) {
-          lastUpdatedTime = difference * 1 + ' ' + strings('0x00000014');
+          lastUpdatedTime = strings('0x00000014');
         } else if (difference < 3600) {
           lastUpdatedTime =
             Math.round(difference / 60) * 1 + ' ' + strings('0x00000015');
@@ -148,6 +162,7 @@ export default class MeasureScrn extends React.Component {
     if (this.state.systemStatus.motorState === Status.ON) {
       this.setState({
         showProgressModal: true,
+        progressMessage: strings('0x0000001B'),
       });
       Motor.turnOff()
         .then(() => {
@@ -157,7 +172,7 @@ export default class MeasureScrn extends React.Component {
               progressMessage: null,
             },
             () => {
-              Toast.show(strings('0x00000011'), Toast.SHORT, Toast.CENTER);
+              Toast.show(strings('0x0000001A'), Toast.SHORT, Toast.CENTER);
             },
           );
         })
@@ -173,7 +188,7 @@ export default class MeasureScrn extends React.Component {
               progressMessage: null,
             },
             () => {
-              Toast.show(strings('0x00000010'), Toast.SHORT, Toast.CENTER);
+              Toast.show(strings('0x0000001C'), Toast.SHORT, Toast.CENTER);
             },
           );
         });
@@ -246,10 +261,22 @@ export default class MeasureScrn extends React.Component {
 
         <rn.View style={styles.bottomView}>
           <rn.View style={styles.motorTextView}>
-            <rn.Text style={styles.motorStatusText}>
-              {strings('motorStatus') +
-                this.getStateString(this.state.systemStatus.motorState)}
-            </rn.Text>
+            <rn.View style={styles.motorStatus}>
+              <rn.Text style={styles.motorStatusText}>
+                {strings('motorStatus')}
+              </rn.Text>
+              <rn.Text
+                // eslint-disable-next-line react-native/no-inline-styles
+                style={{
+                  ...styles.motorStatusText,
+                  color:
+                    this.state.systemStatus.motorState === Status.ON
+                      ? 'green'
+                      : 'red',
+                }}>
+                {this.getStateString(this.state.systemStatus.motorState)}
+              </rn.Text>
+            </rn.View>
             <rn.Text style={styles.motorUpdatedText}>
               {strings('0x00000012') + this.state.lastUpdatedTime}
             </rn.Text>
@@ -257,11 +284,7 @@ export default class MeasureScrn extends React.Component {
           <rn.View style={styles.motorStatusButtonView}>
             <rn.TouchableOpacity
               activeOpacity={0}
-              // eslint-disable-next-line react-native/no-inline-styles
-              style={{
-                ...styles.onButton,
-                backgroundColor: themes.colors.motorStatusOnbutton,
-              }}
+              style={styles.onButton}
               onPress={this.onPressOnButton.bind(this)}>
               <rn.Text style={styles.onButtonText}>
                 {strings('onLabel')}
@@ -269,24 +292,18 @@ export default class MeasureScrn extends React.Component {
             </rn.TouchableOpacity>
             <rn.TouchableOpacity
               activeOpacity={0}
-              // eslint-disable-next-line react-native/no-inline-styles
-              style={{
-                ...styles.offButton,
-                backgroundColor: themes.colors.motorStatusOffButton,
-              }}
+              style={styles.offButton}
               onPress={this.onPressOffButton.bind(this)}>
-              <rn.Text // eslint-disable-next-line react-native/no-inline-styles
-                style={{
-                  ...styles.offButtonText,
-                  color: themes.colors.primaryFg1,
-                }}>
+              <rn.Text style={styles.offButtonText}>
                 {strings('offLabel')}
               </rn.Text>
             </rn.TouchableOpacity>
           </rn.View>
         </rn.View>
         <ProgressDialog
-          isVisible={this.state.showProgressModal}
+          isVisible={
+            this.state.showProgressModal || this.state.showInitialProgressModal
+          }
           message={this.state.progressMessage}
         />
       </rn.View>
@@ -342,11 +359,14 @@ const styles = rn.StyleSheet.create({
     justifyContent: 'center',
     flex: 1,
   },
-  motorStatusText: {
+  motorStatus: {
     marginTop: hp(29),
-    fontSize: wp(20),
+    flexDirection: 'row',
+  },
+  motorStatusText: {
     fontFamily: themes.fonts.medium1,
     color: themes.colors.primaryFg2,
+    fontSize: wp(20),
   },
   motorUpdatedText: {
     fontSize: wp(12),
@@ -373,7 +393,7 @@ const styles = rn.StyleSheet.create({
     alignItems: 'center',
   },
   onButton: {
-    backgroundColor: themes.colors.motorStatusOnbutton,
+    backgroundColor: themes.colors.motorStatusOnButton,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 100,

@@ -14,7 +14,7 @@ export default {
   phase2BackgroundColor: 'lightgray',
   phase1Color: 'red',
   phase1BackgroundColor: 'lightgray',
-  motorStatusOnbutton: 'green',
+  motorStatusOnButton: 'green',
   motorStatusOffButton: 'red',
 
   validationIconError: '#ad3d3c',
