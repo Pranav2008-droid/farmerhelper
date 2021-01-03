@@ -32,11 +32,20 @@ var realtimeDb = firebase.database();
 function debugLog(msg) {
   if (debug) {
     var currentTime = new Date();
-    var dateString = ("0" + currentTime.getDate()).slice(-2) + "-" + 
-        ("0"+(currentTime.getMonth()+1)).slice(-2) + "-" + currentTime.getFullYear() + " " + 
-        ("0" + currentTime.getHours()).slice(-2) +":"+ ("0" + currentTime.getMinutes()).slice(-2) +
-        ":" + ("0" + currentTime.getSeconds()).slice(-2) + "." + 
-        ("00" + currentTime.getMilliseconds()).slice(-3);
+    var dateString =
+      ('0' + currentTime.getDate()).slice(-2) +
+      '-' +
+      ('0' + (currentTime.getMonth() + 1)).slice(-2) +
+      '-' +
+      currentTime.getFullYear() +
+      ' ' +
+      ('0' + currentTime.getHours()).slice(-2) +
+      ':' +
+      ('0' + currentTime.getMinutes()).slice(-2) +
+      ':' +
+      ('0' + currentTime.getSeconds()).slice(-2) +
+      '.' +
+      ('00' + currentTime.getMilliseconds()).slice(-3);
     console.log(dateString + ': ' + msg);
   }
 }
@@ -67,15 +76,18 @@ function getCurrentServerTime() {
 function updateSystemStatus() {
   debugLog('powerState = ' + powerState);
   var ref = firebase.database().ref('/systemStatus');
-  ref.update({
-    motorState: motorState,
-    powerState: powerState,
-    timestamp: firebase.database.ServerValue.TIMESTAMP,
-  }).then( () => {
+  ref
+    .update({
+      motorState: motorState,
+      powerState: powerState,
+      timestamp: firebase.database.ServerValue.TIMESTAMP,
+    })
+    .then(() => {
       debugLog('Status updated successfully');
-  }).catch((err) => {
+    })
+    .catch((err) => {
       debugLog('Updating status failed. ' + err);
-  });
+    });
 }
 
 async function getTimeDiff() {
@@ -83,7 +95,7 @@ async function getTimeDiff() {
   var localCurTime = Date.now() / 1000;
   debugLog('Server time = ' + serverTime);
   debugLog('Local time = ' + localCurTime);
-  timeDiff = parseInt(localCurTime - serverTime);
+  timeDiff = parseInt(localCurTime - serverTime, 10);
   return timeDiff;
 }
 
@@ -94,46 +106,61 @@ function dbUpdateHandler(data) {
     .database()
     .ref('/command/timestamp')
     .once('value', (timeStampData) => {
-      var commandTimestamp = parseInt(timeStampData.val());
+      var commandTimestamp = parseInt(timeStampData.val(), 10);
       var commandRef = null;
       var timeSinceCmdRequested = localTime + timeDiff - commandTimestamp;
       debugLog('commandTimeStamp = ' + commandTimestamp);
       debugLog('localTime = ' + localTime);
-      debugLog('timediff = ' + timeDiff);
+      debugLog('time diff = ' + timeDiff);
       debugLog('timeSinceCmdRequested = ' + timeSinceCmdRequested);
       if (timeSinceCmdRequested < 1800) {
-        if (data.val() == 'prepareStart') {
+        if (data.val() === 'prepareStart') {
           debugLog('Ready to start the motor');
           commandRef = firebase.database().ref('/command/');
-          commandRef.update({
-            response: 'ready',
-          }).then(() => {
-          }).catch((err) => {
-            debugLog('Error while while acknowledging ready state to start the motor.' + err);
-          });
+          commandRef
+            .update({
+              response: 'ready',
+            })
+            .then(() => {})
+            .catch((err) => {
+              debugLog(
+                'Error while while acknowledging ready state to start the motor.' +
+                  err,
+              );
+            });
         }
-        if (data.val() == 'confirmStart') {
+        if (data.val() === 'confirmStart') {
           debugLog('Starting the motor');
           turnOnMotor();
           commandRef = firebase.database().ref('/command/');
-          commandRef.update({
-            request: '',
-          }).then(() => {
-          }).catch((err) => {
-            debugLog('Motor started. But error while acknowledging start command.' + err);
-          });
+          commandRef
+            .update({
+              request: '',
+            })
+            .then(() => {})
+            .catch((err) => {
+              debugLog(
+                'Motor started. But error while acknowledging start command.' +
+                  err,
+              );
+            });
         }
-        if (data.val() == 'stop') {
+        if (data.val() === 'stop') {
           debugLog('Stopping the motor');
           turnOffMotor();
           commandRef = firebase.database().ref('/command/');
-          commandRef.update({
-            request: '',
-            response: 'stopped',
-          }).then(() => {
-          }).catch((err) => {
-            debugLog('Motor stopped. But error while acknowledging stop command.' + err);
-          });
+          commandRef
+            .update({
+              request: '',
+              response: 'stopped',
+            })
+            .then(() => {})
+            .catch((err) => {
+              debugLog(
+                'Motor stopped. But error while acknowledging stop command.' +
+                  err,
+              );
+            });
         }
       }
     });
@@ -152,12 +179,12 @@ function turnOffMotor() {
 }
 
 getTimeDiff().then((diff) => {
-  debugLog('Localtime diff with server timestamp = ' + diff);
+  debugLog('Local time diff with server timestamp = ' + diff);
   var ref = firebase.database().ref('/command/request');
   ref.on('value', dbUpdateHandler);
 });
 
-if (current.readSync() == 1) {
+if (current.readSync() === 1) {
   powerState = Status.ON;
 } else {
   powerState = Status.OFF;
@@ -174,7 +201,7 @@ current.watch(function (err, value) {
       debugLog('Power state change from on to off');
       powerState = Status.OFF;
       if (motorState === Status.ON) {
-	debugLog('Changing motor state to off due to power failure');
+        debugLog('Changing motor state to off due to power failure');
         turnOffMotor();
       } else {
         updateSystemStatus();
@@ -184,14 +211,14 @@ current.watch(function (err, value) {
       debugLog('Power state is already off');
     }
   } else if (value === 1) {
-    if ( powerState === Status.OFF ) {
+    if (powerState === Status.OFF) {
       powerState = Status.ON;
       updateSystemStatus();
     } else {
       debugLog('Power state is already on');
     }
   } else {
-    debugLog('Unknown value('+ value +') received in current.watch');
+    debugLog('Unknown value(' + value + ') received in current.watch');
   }
 });
 
