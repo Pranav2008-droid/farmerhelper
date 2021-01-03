@@ -186,7 +186,7 @@ current.watch(function (err, value) {
       debugLog('Power state is already on');
     }
   } else {
-    debugLog('Unknown value('+ value +') received in current.watch'
+    debugLog('Unknown value('+ value +') received in current.watch');
   }
 });
 
