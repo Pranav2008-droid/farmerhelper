@@ -1,11 +1,11 @@
 var Types = require('../common/types');
-var Status = Types.Status;
 var firebase = require('firebase/app');
 var motor = require('./motor');
 var Gpio = require('onoff').Gpio;
-var current = new Gpio(21, 'in', 'both');
-var motorState = 'off';
-var powerState = 'off';
+var current = new Gpio(20, 'in', 'both');
+var Status = Types.Status;
+var motorState = Status.OFF;
+var powerState = Status.OFF;
 var timeDiff = 0;
 var debug = true;
 
@@ -136,13 +136,13 @@ function dbUpdateHandler(data) {
 
 function turnOnMotor() {
   motor.turnOnMotor();
-  motorState = 'on';
+  motorState = Status.ON;
   updateSystemStatus();
 }
 
 function turnOffMotor() {
   motor.turnOffMotor();
-  motorState = 'off';
+  motorState = Status.OFF;
   updateSystemStatus();
 }
 
@@ -153,25 +153,40 @@ getTimeDiff().then((diff) => {
 });
 
 if (current.readSync() == 1) {
-  powerState = 'on';
+  powerState = Status.ON;
 } else {
-  powerState = 'off';
+  powerState = Status.OFF;
 }
 updateSystemStatus();
 
 current.watch(function (err, value) {
   if (err) {
-    console.log(err);
+    debugLog('Error while watching current status ' + err);
     return;
   }
   if (value === 0) {
-    powerState = 'off';
-    if (motorState === 'on') {
-      turnOffMotor();
+    if (powerState === Status.ON) {
+      debugLog('Power state change from on to off');
+      powerState = Status.OFF;
+      if (motorState === Status.ON) {
+	debugLog('Changing motor state to off due to power failure');
+        turnOffMotor();
+      } else {
+        updateSystemStatus();
+      }
+    } else {
+      // We should never reach here as powerState should be ON when the value is 0
+      debugLog('Power state is already off');
     }
   } else if (value === 1) {
-    powerState = 'on';
-    updateSystemStatus();
+    if ( powerState === STATUS.OFF ) {
+      powerState = Status.ON;
+      updateSystemStatus();
+    } else {
+      debugLog('Power state is already on');
+    }
+  } else {
+    debugLog('Unknown value('+ value +') received in current.watch'
   }
 });
 
