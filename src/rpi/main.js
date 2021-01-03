@@ -184,7 +184,7 @@ current.watch(function (err, value) {
       debugLog('Power state is already off');
     }
   } else if (value === 1) {
-    if ( powerState === STATUS.OFF ) {
+    if ( powerState === Status.OFF ) {
       powerState = Status.ON;
       updateSystemStatus();
     } else {
