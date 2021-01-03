@@ -20,6 +20,11 @@ var firebaseConfig = {
   messagingSenderId: '187476232499',
   appId: '1:187476232499:web:57c36aef8e9146bdfb5646',
 };
+
+console.log('\n');
+debugLog('Starting motor controller');
+console.log('\n');
+
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 var realtimeDb = firebase.database();
