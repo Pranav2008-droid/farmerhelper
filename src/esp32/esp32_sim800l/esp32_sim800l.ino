@@ -11,9 +11,9 @@
 //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
 
 //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
-const char FIREBASE_HOST[]  = "ENTER_FIREBASE_HOST";
-const String FIREBASE_AUTH  = "ENTER_FIREBASE_AUTH";
-const String FIREBASE_PATH  = "/";
+const char FIREBASE_HOST[]  = "farmerhelper-70abb.firebaseio.com";
+const String FIREBASE_AUTH  = "nJSuwZ2Qlg4A8s0rvHnnlq7zcu1uWRBGN33gCJAk";
+  const String FIREBASE_PATH  = "/";
 const int SSL_PORT          = 443;
 //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
 
@@ -94,7 +94,7 @@ void loop() {
   Serial.println("GPRS connection successful");
   //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
   
-  http_client.connect("www.google.com", SSL_PORT);
+  http_client.connect(FIREBASE_HOST, SSL_PORT);
   
   //MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
   while (true) {
@@ -105,8 +105,9 @@ void loop() {
       break;
     }
     else{
-      Serial.println("\nConnected to google.com");
-      //PostToFirebase("PATCH", FIREBASE_PATH, "hello world", &http_client);
+      Serial.println("\nConnected to firebase.com");
+      PostToFirebase("PATCH", FIREBASE_PATH, "12345", &http_client);
+      delay(15000);
     }
   }
   //MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
