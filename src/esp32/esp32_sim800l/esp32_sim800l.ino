@@ -12,14 +12,25 @@
 
 const char FIREBASE_HOST[]  = "myhost";
 const String FIREBASE_AUTH  = "myauth";
-  const String FIREBASE_PATH  = "/";
+const String FIREBASE_PATH  = "/";
 const int SSL_PORT          = 443;
+
+#define ON 1
+#define OFF 0
+
+struct __SystemStatus{
+  int motorState;
+  int powerState;
+};
+typedef struct __SystemStatus SystemStatus;
+
+SystemStatus sysStatus;
 
 #define INFO 0
 #define ERR 1
 #define NONE 10
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 void debugPrintFuncBase(int level, String func, int line) {
     if (level != NONE) {
@@ -109,9 +120,15 @@ void setup() {
   
   // Unlock your SIM card with a PIN
   modem.simUnlock("0000");
+
+  sysStatus.motorState = OFF;
+  sysStatus.powerState = ON;
+
   
   http_client.setHttpResponseTimeout(90 * 1000); //^0 secs timeout
   debugPrintln(INFO, "Setup completed");
+
+
 }
 //**************************************************************************************************
 
@@ -141,14 +158,15 @@ void loop() {
       debugPrint(INFO, "Connected to ");
       debugPrintln(NONE, FIREBASE_HOST);
       getServerTimeStamp(&http_client);
-      delay(15000);
+      updateSystemStatus(&http_client);
+      delay(30000);
     }
   }
 }
 //**************************************************************************************************
 
 //**************************************************************************************************
-void ReadFromFirebase(const char* method, const String & path , const String & data, HttpClient* http) {
+void readFromFirebase(const char* method, const String & path , const String & data, HttpClient* http) {
   String response;
   int statusCode = 0;
   http->connectionKeepAlive(); // Currently, this is needed for HTTPS
@@ -188,7 +206,7 @@ void ReadFromFirebase(const char* method, const String & path , const String & d
   }
   //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
 }
-void PostToFirebase(const char* method, const String & path , const String & data, HttpClient* http) {
+void postToFirebase(const char* method, const String & path , const String & data, HttpClient* http) {
   String response;
   int statusCode = 0;
   http->connectionKeepAlive(); // Currently, this is needed for HTTPS
@@ -231,13 +249,13 @@ void PostToFirebase(const char* method, const String & path , const String & dat
 long getServerTimeStamp(HttpClient* http){
 
   String response;
-  String data("{\"timestamp\":{\".sv\":\"timestamp\"}}");
+  String data("{\".sv\":\"timestamp\"}");
   int statusCode = 0;
   long timestamp = 0;
 
   http->connectionKeepAlive(); // Currently, this is needed for HTTPS
   
-  String url("/.json?auth=");
+  String url("/timestamp.json?auth=");
   url += FIREBASE_AUTH;
   
   String contentType = "application/json";
@@ -277,5 +295,21 @@ long getTimeStamp(const String &str) {
   int timestampValStart = str.indexOf(":") + 1;
   String timestampStr = str.substring(timestampValStart,timestampValStart + 10);
   return timestampStr.toInt();
+}
+
+void updateSystemStatus( HttpClient *http){
+    
+  String url("/systemStatus");
+
+  String jsonData = "{"
+    "\"motorState\":<motorState>,"
+    "\"powerState\":<powerState>,"
+    "\"timestamp\":{\".sv\":\"timestamp\"}"
+  "}";
+
+  jsonData.replace("<motorState>",String(sysStatus.motorState));
+  jsonData.replace("<powerState>",String(sysStatus.powerState));
+
+  postToFirebase("PATCH",url, jsonData, http);
 }
 //**************************************************************************************************
