@@ -84,6 +84,16 @@ export default class MotorApi {
       },
     });
   }
+  static updateSystemStatus() {
+    const dbRef = database().ref('/');
+    return dbRef.update({
+      command: {
+        request: 'updateSystemStatus',
+        response: '',
+        timestamp: database.ServerValue.TIMESTAMP,
+      },
+    });
+  }
   static getRealtimeData() {
     return new Promise((resolve, reject) => {
       const systemRef = database().ref('/systemStatus');

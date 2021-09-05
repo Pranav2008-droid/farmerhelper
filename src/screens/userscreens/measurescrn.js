@@ -31,8 +31,10 @@ export default class MeasureScrn extends React.Component {
     this.globalSize = 1.8;
     this.maxVoltage = 440;
     this.listener = null;
+    this.systemStatusUpdater = null;
     this.lastUpdatedTimeRefresher = null;
     this.refreshLastUpdatedTime = this.refreshLastUpdatedTime.bind(this);
+    this.handleAppStateChange = this.handleAppStateChange.bind(this);
   }
   componentDidMount() {
     this.listener = Motor.registerMotorStateListener((data) => {
@@ -49,6 +51,30 @@ export default class MeasureScrn extends React.Component {
       );
     });
     this.startLastUpdatedTimeRefresher();
+    this.startSystemStatusUpdate();
+    rn.AppState.addEventListener('change', this.handleAppStateChange);
+  }
+  startSystemStatusUpdate() {
+    if (!this.systemStatusUpdater) {
+      this.systemStatusUpdater = setInterval(() => {
+        Motor.updateSystemStatus()
+          .then(() => {
+            console.log('Motor status update requested successfully');
+          })
+          .catch((e) => {
+            console.log('Error while updating motor status');
+            console.log(e);
+          });
+      }, 300000);
+    } else {
+      console.log('System status updater is already running');
+    }
+  }
+  stopSystemStatusUpdate() {
+    if (this.systemStatusUpdater) {
+      clearTimeout(this.systemStatusUpdater);
+      this.systemStatusUpdater = null;
+    }
   }
   refreshLastUpdatedTime() {
     var lastUpdatedTime = strings('0x00000013');
@@ -78,6 +104,8 @@ export default class MeasureScrn extends React.Component {
             Math.round(difference / 3600) * 1 + ' ' + strings('0x00000016');
         }
       }
+      //TODO: Add last update for morethan a day. Currently its updated only upto 24 hours. If last
+      //update time is > 24, currently we show "Not Available"
     }
     this.setState({
       lastUpdatedTime: lastUpdatedTime,
@@ -98,6 +126,17 @@ export default class MeasureScrn extends React.Component {
   componentWillUnmount() {
     Motor.unregisterMotorStateListener(this.listener);
     this.stopLastUpdatedTimeRefresher();
+    this.stopSystemStatusUpdate();
+    rn.AppState.removeEventListener('change', this.handleAppStateChange);
+  }
+  handleAppStateChange(nextAppState) {
+    if (nextAppState === 'active') {
+      console.log('App has come to the foreground!');
+      this.startSystemStatusUpdate();
+    } else {
+      this.stopSystemStatusUpdate();
+      console.log('App is not in foreground');
+    }
   }
   getStateString(state) {
     var stringState = strings('0x00000013');
@@ -120,16 +159,22 @@ export default class MeasureScrn extends React.Component {
       (this.state.systemStatus.motorState === Status.OFF) &
       (this.state.systemStatus.powerState === Status.ON)
     ) {
+      this.stopSystemStatusUpdate();
       this.setState({
         showProgressModal: true,
         progressMessage: strings('0x0000000F'),
       });
       Motor.turnOn()
         .then(() => {
+          this.startSystemStatusUpdate();
           this.setState(
             {
               showProgressModal: false,
               progressMessage: null,
+              systemStatus: {
+                ...this.state.systemStatus,
+                motorState: Status.ON,
+              },
             },
             () => {
               Toast.show(strings('0x00000011'), Toast.SHORT, Toast.CENTER);
@@ -138,6 +183,7 @@ export default class MeasureScrn extends React.Component {
         })
         .catch((err) => {
           console.log(err);
+          this.startSystemStatusUpdate();
           this.setState(
             {
               systemStatus: {
@@ -160,12 +206,14 @@ export default class MeasureScrn extends React.Component {
   }
   onPressOffButton() {
     if (this.state.systemStatus.motorState === Status.ON) {
+      this.stopSystemStatusUpdate();
       this.setState({
         showProgressModal: true,
         progressMessage: strings('0x0000001B'),
       });
       Motor.turnOff()
         .then(() => {
+          this.startSystemStatusUpdate();
           this.setState(
             {
               showProgressModal: false,
@@ -177,6 +225,7 @@ export default class MeasureScrn extends React.Component {
           );
         })
         .catch((err) => {
+          this.startSystemStatusUpdate();
           console.log(err);
           this.setState(
             {
@@ -234,7 +283,7 @@ export default class MeasureScrn extends React.Component {
                     ? 'green'
                     : 'red',
               }}>
-              {this.state.systemStatus.powerState}
+              {this.getStateString(this.state.systemStatus.powerState)}
             </rn.Text>
           </rn.View>
           <rn.View style={styles.voltageMeterView}>

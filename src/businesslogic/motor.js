@@ -83,6 +83,17 @@ export default class Motor {
       }, 30000);
     });
   }
+  static updateSystemStatus() {
+    return new Promise(async (resolve, reject) => {
+      try {
+        await MotorApi.updateSystemStatus();
+        resolve();
+      } catch (error) {
+        console.log('Motor.turnOn: Error while sending confirmStart ' + error);
+        reject(error);
+      }
+    });
+  }
   static registerMotorStateListener(motorStateListener) {
     return MotorApi.registerMotorStateListener(motorStateListener);
   }
