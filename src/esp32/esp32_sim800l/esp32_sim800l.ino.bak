@@ -13,14 +13,10 @@
 const char FIREBASE_HOST[]  = "farmerhelper-70abb.firebaseio.com";
 const String FIREBASE_AUTH  = "nJSuwZ2Qlg4A8s0rvHnnlq7zcu1uWRBGN33gCJAk";
 const String FIREBASE_PATH  = "/";
-const String CMD_URL = "/command";
 const int SSL_PORT          = 443;
-long lastSystemUpdateTimestamp = 0;
 
 #define ON 1
 #define OFF 0
-#define CMD_REQUEST_TIMEOUT 30
-#define CMD_CONFIRMATION_DELAY 1000
 
 struct __SystemStatus{
   int motorState;
@@ -86,7 +82,7 @@ char pass[] = "";
 #define txPin 2
 HardwareSerial sim800(1);
 #define TINY_GSM_DEBUG Serial
-//#define DUMP_AT_COMMANDS
+#define DUMP_AT_COMMANDS
 #ifdef DUMP_AT_COMMANDS
   #include <StreamDebugger.h>
   StreamDebugger debugger(sim800, Serial);
@@ -150,11 +146,6 @@ void loop() {
   debugPrintln(INFO, "GPRS connection successful");
   
   http_client.connect(FIREBASE_HOST, SSL_PORT);
-  if (http_client.connected()) {
-      debugPrint(INFO, "Connected to ");
-      debugPrintln(NONE, FIREBASE_HOST);
-      http_client.connectionKeepAlive();
-  }
   
   while (true) {
     if (!http_client.connected()) {
@@ -164,17 +155,22 @@ void loop() {
       break;
     }
     else{
-      handleCmdRequests(&http_client);
-      delay(5000);
+      debugPrint(INFO, "Connected to ");
+      debugPrintln(NONE, FIREBASE_HOST);
+      getServerTimeStamp(&http_client);
+      updateSystemStatus(&http_client);
+      handleDbUpddates();
+      delay(30000);
     }
   }
 }
 //**************************************************************************************************
 
 //**************************************************************************************************
-String readFromFirebase( const String & path , HttpClient* http) {
+String readFromFirebase( const String & path , const String & data, HttpClient* http) {
   String response;
   int statusCode = 0;
+  http->connectionKeepAlive(); // Currently, this is needed for HTTPS
   
   //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
   String url;
@@ -193,7 +189,7 @@ String readFromFirebase( const String & path , HttpClient* http) {
   //statusCode-200 (OK) | statusCode -3 (TimeOut)
   statusCode = http->responseStatusCode();
   debugPrint(INFO,"Status code: ");
-  debugPrintln(NONE,statusCode);
+  debugPrintln(INFO,statusCode);
   response = http->responseBody();
   return response;
   //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
@@ -206,9 +202,10 @@ String readFromFirebase( const String & path , HttpClient* http) {
   }
   //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
 }
-void postToFirebase( const String & path , const String & data, HttpClient* http) {
+void postToFirebase(const char* method, const String & path , const String & data, HttpClient* http) {
   String response;
   int statusCode = 0;
+  http->connectionKeepAlive(); // Currently, this is needed for HTTPS
   
   //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
   String url;
@@ -252,6 +249,8 @@ long getServerTimeStamp(HttpClient* http){
   int statusCode = 0;
   long timestamp = 0;
 
+  http->connectionKeepAlive(); // Currently, this is needed for HTTPS
+  
   String url("/timestamp.json?auth=");
   url += FIREBASE_AUTH;
   
@@ -293,14 +292,8 @@ long getTimeStamp(const String &str) {
   String timestampStr = str.substring(timestampValStart,timestampValStart + 10);
   return timestampStr.toInt();
 }
-long getTimeStamp1(const String &str) {
-  int timestampValStart = str.indexOf("timestamp\":") + 11;
-  String timestampStr = str.substring(timestampValStart,timestampValStart + 10);  
-  return timestampStr.toInt();
-}
 
-
-void updateSystemStatus(HttpClient *http){
+void updateSystemStatus( HttpClient *http){
     
   String url("/systemStatus");
 
@@ -313,117 +306,24 @@ void updateSystemStatus(HttpClient *http){
   jsonData.replace("<motorState>",String(sysStatus.motorState));
   jsonData.replace("<powerState>",String(sysStatus.powerState));
 
-  postToFirebase(url, jsonData, http);
+  postToFirebase("PATCH",url, jsonData, http);
 }
-void turnOnMotor(HttpClient *http){
-  delay(100);
-  debugPrintln(INFO, "Motor successfully turned on");
+void turnOnMotor(){
+  Serial.println("Turning on the motor");
+  delay(4000);
+  Serial.println("Motor successfully turned on");
   sysStatus.motorState = ON;
-  updateSystemStatus(http);
 }
 
-void turnOffMotor(HttpClient *http){
-  delay(100);
-  debugPrintln(INFO, "Motor successfully turned off");
+void turnOffMotor(){
+  Serial.println("Turning off the motor");
+  delay(4000);
+  Serial.println("Motor successfully turned off");
   sysStatus.motorState = OFF;
-  updateSystemStatus(http);
 }
 
-void handleCmdRequests(HttpClient *http){
-  DynamicJsonDocument jsonCmd(256);
-  String strCmd;
-  const char *request = NULL;
-  
-  getCommand(strCmd, jsonCmd, http);
-  request = jsonCmd["request"];
-  if (strcmp(request,"prepareStart") == 0) {
-    handleMotorStart(strCmd, http);
-  }
-  if (strcmp(request,"stop") == 0) {
-    handleMotorStop(strCmd, http);
-  }
-  if (strcmp(request,"updateSystemStatus") == 0) {
-    handleUpdateSystemStatus(strCmd,http);
-  }
-  
-}
-void handleMotorStart(const String &strCmd, HttpClient *http){
-  long currentServerTimestamp = 0;
-  long requestTimestamp = 0;
-  String confirmCmd;
-  DynamicJsonDocument jsonCmd(256);
-  const char *request = NULL;
-  int retryCount = 0;
-
-  requestTimestamp = getTimeStamp1(strCmd);
-  currentServerTimestamp = getServerTimeStamp(http);
-  if ((currentServerTimestamp - requestTimestamp) <= CMD_REQUEST_TIMEOUT){
-    String jsonData = "{"
-        "\"request\":\"\","
-        "\"response\":\"ready\","
-        "\"timestamp\":{\".sv\":\"timestamp\"}"
-      "}";
-
-    postToFirebase(CMD_URL,jsonData, http);
-    while (true){
-      delay(CMD_CONFIRMATION_DELAY);      
-      getCommand(confirmCmd, jsonCmd, http);
-      request = jsonCmd["request"];
-      if (strcmp(request,"confirmStart") == 0) {
-        turnOnMotor(http);
-        break ;
-
-      }
-      retryCount ++;
-      debugPrint(INFO, "Confirmstart retryCount : ");
-      debugPrintln(NONE, retryCount);
-      if (retryCount > 30){
-        debugPrintln(INFO, "Reached maximum retry for confirm start");
-        break;
-      }
-    }
-
-  }
-}
-
-void handleMotorStop(const String &strCmd, HttpClient *http){
-  long currentServerTimestamp = 0;
-  long requestTimestamp = 0;
-
-  requestTimestamp = getTimeStamp1(strCmd);
-  currentServerTimestamp = getServerTimeStamp(http);
-
-  if ((currentServerTimestamp - requestTimestamp) <= CMD_REQUEST_TIMEOUT){
-    turnOffMotor(http);
-    String jsonData = "{"
-        "\"request\":\"\","
-        "\"response\":\"stopped\","
-        "\"timestamp\":{\".sv\":\"timestamp\"}"
-      "}";
-
-    postToFirebase(CMD_URL,jsonData, http);
-  }
-}
-
-void getCommand(String &strCmd, DynamicJsonDocument &jsonCmd, HttpClient *http){
-  char cmd[200];
-  strCmd = readFromFirebase(CMD_URL, http);
-  debugPrintln(INFO, strCmd);
-  strCmd.toCharArray(cmd, 200);
-  deserializeJson(jsonCmd, cmd);  
+void handleDbUpddates(){
+Serial.println(readFromFirebase("/command/request", "0", &http_client));
 
 }
-void handleUpdateSystemStatus(const String &strCmd,HttpClient *http){ 
-  long requestTimestamp = 0;
-
-  requestTimestamp = getTimeStamp1(strCmd);
-
-  if(requestTimestamp == lastSystemUpdateTimestamp){
-    return;
-  }
-  lastSystemUpdateTimestamp = requestTimestamp;
-  updateSystemStatus(http);
-}
-
-
 //**************************************************************************************************
