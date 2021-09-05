@@ -10,8 +10,8 @@
 #include <ArduinoJson.h>
 #include <TimeLib.h>
 
-const char FIREBASE_HOST[]  = "farmerhelper-70abb.firebaseio.com";
-const String FIREBASE_AUTH  = "nJSuwZ2Qlg4A8s0rvHnnlq7zcu1uWRBGN33gCJAk";
+const char FIREBASE_HOST[]  = "";
+const String FIREBASE_AUTH  = "";
 const String FIREBASE_PATH  = "/";
 const String CMD_URL = "/command";
 const int SSL_PORT          = 443;
@@ -172,8 +172,7 @@ void loop() {
 //**************************************************************************************************
 
 //**************************************************************************************************
-String readFromFirebase( const String & path , HttpClient* http) {
-  String response;
+bool readFromFirebase(String &response, const String & path , HttpClient* http) {
   int statusCode = 0;
   
   //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
@@ -192,18 +191,13 @@ String readFromFirebase( const String & path , HttpClient* http) {
   // read the status code and body of the response
   //statusCode-200 (OK) | statusCode -3 (TimeOut)
   statusCode = http->responseStatusCode();
-  debugPrint(INFO,"Status code: ");
-  debugPrintln(NONE,statusCode);
-  response = http->responseBody();
-  return response;
-  //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
-
-  //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
-  if (!http->connected()) {
-    Serial.println();
-    http->stop();// Shutdown
-    Serial.println("HTTP POST disconnected");
+  if (statusCode != 200) {
+    debugPrint(ERR, "HTTPS Request failed. Status code: ");
+    debugPrintln(NONE, statusCode);
+    return false;
   }
+  response = http->responseBody();
+  return true;
   //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
 }
 void postToFirebase( const String & path , const String & data, HttpClient* http) {
@@ -230,11 +224,14 @@ void postToFirebase( const String & path , const String & data, HttpClient* http
   // read the status code and body of the response
   //statusCode-200 (OK) | statusCode -3 (TimeOut)
   statusCode = http->responseStatusCode();
-  Serial.print("Status code: ");
-  Serial.println(statusCode);
-  response = http->responseBody();
-  Serial.print("Response: ");
-  Serial.println(response);
+  if (statusCode == 200) {
+    response = http->responseBody();
+    Serial.print("Response: ");
+    Serial.println(response);
+  } else {
+    debugPrint(ERR, "HTTPS Request failed. Status code: ");
+    debugPrintln(NONE, statusCode);
+  }
   //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
 
   //NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
@@ -334,7 +331,10 @@ void handleCmdRequests(HttpClient *http){
   String strCmd;
   const char *request = NULL;
   
-  getCommand(strCmd, jsonCmd, http);
+  if (!getCommand(strCmd, jsonCmd, http)) {
+    debugPrintln(INFO, "Failed to read firebase db for command requests");
+    return;
+  }
   request = jsonCmd["request"];
   if (strcmp(request,"prepareStart") == 0) {
     handleMotorStart(strCmd, http);
@@ -367,7 +367,10 @@ void handleMotorStart(const String &strCmd, HttpClient *http){
     postToFirebase(CMD_URL,jsonData, http);
     while (true){
       delay(CMD_CONFIRMATION_DELAY);      
-      getCommand(confirmCmd, jsonCmd, http);
+      if (!getCommand(confirmCmd, jsonCmd, http)) {
+        debugPrintln(INFO, "Failed to read firebase db while waiting for confirmStart");
+        break;
+      }
       request = jsonCmd["request"];
       if (strcmp(request,"confirmStart") == 0) {
         turnOnMotor(http);
@@ -405,13 +408,15 @@ void handleMotorStop(const String &strCmd, HttpClient *http){
   }
 }
 
-void getCommand(String &strCmd, DynamicJsonDocument &jsonCmd, HttpClient *http){
+bool getCommand(String &strCmd, DynamicJsonDocument &jsonCmd, HttpClient *http){
   char cmd[200];
-  strCmd = readFromFirebase(CMD_URL, http);
+  if (!readFromFirebase(strCmd, CMD_URL, http)) {
+    return false;
+  }
   debugPrintln(INFO, strCmd);
   strCmd.toCharArray(cmd, 200);
   deserializeJson(jsonCmd, cmd);  
-
+  return true;
 }
 void handleUpdateSystemStatus(const String &strCmd,HttpClient *http){ 
   long requestTimestamp = 0;
