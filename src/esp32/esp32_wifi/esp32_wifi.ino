@@ -3,14 +3,16 @@
 #include <WiFi.h>
 #include <IOXhop_FirebaseESP32.h>
 #include <HTTPClient.h>
+#include <ESP32Ping.h>
 
-#define FIREBASE_HOST ""
+#define FIREBASE_HOST "farmerhelper-70abb.firebaseio.com"
 #define FIREBASE_AUTH ""
-#define WIFI_SSID ""
+#define WIFI_SSID "AgriAutomation"
 #define WIFI_PASSWORD ""
 
 const String CMD_URL = "/command";
 const String TMSTAMP_URL = "/timestamp";
+const String STARTUP_URL = "/startup";
 
 long lastSystemUpdateTimestamp = 0;
 
@@ -18,6 +20,8 @@ long lastSystemUpdateTimestamp = 0;
 #define OFF 0
 #define CMD_REQUEST_TIMEOUT 30
 #define CMD_CONFIRMATION_DELAY 1000
+#define RELAY 2
+
 
 struct __SystemStatus{
   int motorState;
@@ -70,6 +74,10 @@ void debugPrintFunc(int level, String func, int line, const String  &msg) {
 #define debugPrint(level, msg)
 #define debugPrintln(level, msg)
 #endif
+
+unsigned long previousMillis = 0;
+unsigned long interval = 30000;
+bool firebaseStreamStarted = false;
 
 long getServerTimeStamp(){
 
@@ -193,6 +201,7 @@ void updateSystemStatus(){
 void turnOnMotor(){
   if (sysStatus.motorState != ON) {
     sysStatus.motorState = ON;
+    digitalWrite(RELAY, LOW);
     String jsonData = "{"
         "\"request\":\"\","
         "\"response\":\"turnedon\","
@@ -210,6 +219,7 @@ void turnOnMotor(){
 void turnOffMotor(){
   if (sysStatus.motorState != OFF) {
     sysStatus.motorState = OFF;
+    digitalWrite(RELAY,HIGH);
     String jsonData = "{"
         "\"request\":\"\","
         "\"response\":\"stopped\","
@@ -239,19 +249,19 @@ void confirmMotorStart(const String &strCmd){
 }
 
 void handleMotorStop(const String &strCmd){
-  long currentServerTimestamp = 0;
-  long requestTimestamp = 0;
+  //long currentServerTimestamp = 0;
+  //long requestTimestamp = 0;
 
-  requestTimestamp = getTimeStamp1(strCmd);
-  currentServerTimestamp = getServerTimeStamp();
+  //requestTimestamp = getTimeStamp1(strCmd);
+  //currentServerTimestamp = getServerTimeStamp();
 
-  if ((currentServerTimestamp - requestTimestamp) <= CMD_REQUEST_TIMEOUT){
+  //if ((currentServerTimestamp - requestTimestamp) <= CMD_REQUEST_TIMEOUT){
     turnOffMotor();
-  } else {
+  /*} else {
     debugPrint(INFO, "Skipping stale stop request. Requested time: ");
     debugPrint(NONE, (currentServerTimestamp - requestTimestamp));
     debugPrintln(NONE, " sec ago");
-  }
+  }*/
 }
 
 void handleUpdateSystemStatus(const String &strCmd){ 
@@ -295,24 +305,8 @@ void handleCmdRequests(String &strCmd)
   }
 }
 
-
-//**************************************************************************************************
-void setup() {
-  Serial.begin(9600);
-  debugPrintln(INFO, "ESP32 Begin setup");
-
-  sysStatus.motorState = OFF;
-  sysStatus.powerState = ON;
-
-  // connect to wifi.
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  debugPrint(INFO, "Connecting to WIFI...");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-  }
-  debugPrintln(NONE, "Connected ");
-  debugPrintln(INFO, WiFi.localIP().toString());
-  
+void initFirebaseStream()
+{
   Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
   Firebase.stream("/command", [](FirebaseStream stream) {
     String eventType = stream.getEvent();
@@ -333,16 +327,101 @@ void setup() {
 
       handleCmdRequests(data);
     }
-  });    
-  //TODO: Write data in firebase realtime db about the startup
+  });
+  firebaseStreamStarted = true;
+}
+void stopFirebaseStream()
+{
+  Firebase.stopStream();
+  firebaseStreamStarted = false;
+}
+//**************************************************************************************************
+void setup() {
+  int count = 90;
+  Serial.begin(9600);
+  debugPrintln(INFO, "ESP32 Begin setup");
+  
+  pinMode(RELAY, OUTPUT);
+  digitalWrite(RELAY, HIGH);
+
+  sysStatus.motorState = OFF;
+  sysStatus.powerState = ON;
+
+  //Wait for 70 seconds for wifi to be available
+  debugPrintln(INFO, "Waiting for 90 seconds for wifi to be available...");
+  while (count-- > 0) {
+    delay(1000);
+    debugPrint(INFO, count);
+    debugPrintln(NONE, " seconds remaining");
+  }
+
+  // connect to wifi.
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  debugPrint(INFO, "Connecting to WIFI...");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+  }
+  debugPrintln(NONE, "Connected ");
+  debugPrintln(INFO, WiFi.localIP().toString());
+
+  delay(5000);
+
+  while(!Ping.ping(FIREBASE_HOST)) {
+    debugPrint(ERR, "Unable to reach ");
+    debugPrint (NONE, FIREBASE_HOST);
+    debugPrintln(NONE, ". Will retry in 10 sec");
+    delay(10000);
+  }
+  String jsonData = "{"
+      "\"request\":\"\","
+      "\"response\":\"stopped\","
+      "\"timestamp\":{\".sv\":\"timestamp\"}"
+    "}";
+  postToFirebase(CMD_URL,jsonData);
+  updateSystemStatus();    
+
+  initFirebaseStream();
+  String startupData = "{"
+      "\"timestamp\":{\".sv\":\"timestamp\"}"
+    "}";
+  postToFirebase(STARTUP_URL, startupData);
+
   debugPrintln(INFO, "Setup completed");
 
 }
 //**************************************************************************************************
 
+void checkWiFiStatus()
+{
+  unsigned long currentMillis = millis();
+  int count = 0;
 
+  // if WiFi is down, try reconnecting
+  if ((WiFi.status() != WL_CONNECTED) && (currentMillis - previousMillis >= interval)) {
+    debugPrintln(INFO, "Reconnecting to WiFi...");
+    WiFi.disconnect();
+    stopFirebaseStream();
+    WiFi.reconnect();
+    count = 0;
+    while (WiFi.status() != WL_CONNECTED && count < 60) {
+      delay(1000);
+      count++;
+    }
+    if (WiFi.status() == WL_CONNECTED)  {
+      while(!Ping.ping(FIREBASE_HOST)) {
+        debugPrint(ERR, "Unable to reach ");
+        debugPrint (NONE, FIREBASE_HOST);
+        debugPrintln(NONE, ". Will retry in 10 sec");
+        delay(10000);
+      }
+      initFirebaseStream();
+    }
+    previousMillis = currentMillis;
+  }
+}
 //**************************************************************************************************
 void loop() {
+  checkWiFiStatus();
   delay(5000);
 }
 //**************************************************************************************************
