@@ -216,6 +216,10 @@ export default class MeasureScrn extends React.Component {
           this.startSystemStatusUpdate();
           this.setState(
             {
+              systemStatus: {
+                ...this.state.systemStatus,
+                motorState: Status.OFF,
+              },
               showProgressModal: false,
               progressMessage: null,
             },
