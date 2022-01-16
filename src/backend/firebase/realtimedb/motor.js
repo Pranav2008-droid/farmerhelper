@@ -1,8 +1,8 @@
 import database from '@react-native-firebase/database';
-
+const prefix = 'test'
 export default class MotorApi {
   static prepareStart() {
-    const dbRef = database().ref('/');
+    const dbRef = database().ref(prefix + '/');
     return dbRef.update({
       command: {
         request: 'prepareStart',
@@ -15,7 +15,7 @@ export default class MotorApi {
     if (!readyStateListener) {
       return;
     }
-    const dbRef = database().ref('/command');
+    const dbRef = database().ref(prefix + '/command');
     return dbRef.on('value', (snapshot) => {
       if (snapshot.val().response === 'ready') {
         readyStateListener();
@@ -23,7 +23,7 @@ export default class MotorApi {
     });
   }
   static confirmStart() {
-    const dbRef = database().ref('/');
+    const dbRef = database().ref(prefix + '/');
     return dbRef.update({
       command: {
         request: 'confirmStart',
@@ -34,7 +34,7 @@ export default class MotorApi {
   }
   static unregisterReadyStateListener(readyStateListenerObj) {
     if (readyStateListenerObj) {
-      const dbRef = database().ref('/command');
+      const dbRef = database().ref(prefix + '/command');
       dbRef.off('value', readyStateListenerObj);
     }
   }
@@ -42,7 +42,7 @@ export default class MotorApi {
     if (!stopStateListener) {
       return;
     }
-    const dbRef = database().ref('/command');
+    const dbRef = database().ref(prefix + '/command');
     return dbRef.on('value', (snapshot) => {
       if (snapshot.val().response === 'stopped') {
         stopStateListener();
@@ -52,7 +52,7 @@ export default class MotorApi {
 
   static unregisterStopStateListener(stopStateListenerObj) {
     if (stopStateListenerObj) {
-      const dbRef = database().ref('/command');
+      const dbRef = database().ref(prefix + '/command');
       dbRef.off('value', stopStateListenerObj);
     }
   }
@@ -60,7 +60,7 @@ export default class MotorApi {
     if (!motorStateListener) {
       return;
     }
-    const dbRef = database().ref('/systemStatus');
+    const dbRef = database().ref(prefix + '/systemStatus');
     return dbRef.on('value', (snapshot) => {
       if (snapshot.val()) {
         motorStateListener(snapshot.val());
@@ -69,13 +69,13 @@ export default class MotorApi {
   }
   static unregisterMotorStateListener(motorStateListenerObj) {
     if (motorStateListenerObj) {
-      const dbRef = database().ref('/systemStatus');
+      const dbRef = database().ref(prefix + '/systemStatus');
       dbRef.off('value', motorStateListenerObj);
     }
   }
 
   static stop() {
-    const dbRef = database().ref('/');
+    const dbRef = database().ref(prefix + '/');
     return dbRef.update({
       command: {
         request: 'stop',
@@ -93,10 +93,10 @@ export default class MotorApi {
         timestamp: database.ServerValue.TIMESTAMP,
       },
     });
-  }
-  static getRealtimeData() {
+  }  
+  static getSystemStatus() {
     return new Promise((resolve, reject) => {
-      const systemRef = database().ref('/systemStatus');
+      const systemRef = database().ref(prefix + '/systemStatus');
       systemRef
         .once('value')
         .then((data) => {

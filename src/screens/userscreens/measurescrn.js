@@ -37,24 +37,34 @@ export default class MeasureScrn extends React.Component {
     this.handleAppStateChange = this.handleAppStateChange.bind(this);
   }
   componentDidMount() {
+    const self = this;
     this.listener = Motor.registerMotorStateListener((data) => {
-      this.setState(
-        {
-          systemStatus: data,
-          showInitialProgressModal: false,
-        },
-        () => {
-          this.stopLastUpdatedTimeRefresher();
-          this.refreshLastUpdatedTime();
-          this.startLastUpdatedTimeRefresher();
-        },
-      );
+      self.setSystemStatus(data);
     });
+    this.updateSystemStatus();
     this.startLastUpdatedTimeRefresher();
     this.startSystemStatusUpdate();
     rn.AppState.addEventListener('change', this.handleAppStateChange);
   }
+  setSystemStatus(status) {
+    this.setState(
+      {
+        systemStatus: status,
+        showInitialProgressModal: false,
+      },
+      () => {
+        this.stopLastUpdatedTimeRefresher();
+        this.refreshLastUpdatedTime();
+        this.startLastUpdatedTimeRefresher();
+      },
+    );
+  }
   startSystemStatusUpdate() {
+
+    // The controller updates the status periodically. so there is 
+    // no need to pull the status.
+    return;
+
     if (!this.systemStatusUpdater) {
       this.systemStatusUpdater = setInterval(() => {
         Motor.updateSystemStatus()
@@ -69,6 +79,30 @@ export default class MeasureScrn extends React.Component {
     } else {
       console.log('System status updater is already running');
     }
+  }
+  updateSystemStatus() {
+    const self = this;
+    Motor.getSystemStatus()
+    .then((data) => {
+      if (data != null) {
+        self.setSystemStatus(data);
+        console.log('Motor status update requested successfully');
+      } else {
+        this.setState(
+          {
+            showInitialProgressModal: false,
+          });
+        console.log('System status returned is null');
+      }
+    })
+    .catch((e) => {
+      this.setState(
+        {
+          showInitialProgressModal: false,
+        });
+      console.log('Error while updating motor status');
+      console.log(e);
+    });
   }
   stopSystemStatusUpdate() {
     if (this.systemStatusUpdater) {
@@ -132,6 +166,7 @@ export default class MeasureScrn extends React.Component {
   handleAppStateChange(nextAppState) {
     if (nextAppState === 'active') {
       console.log('App has come to the foreground!');
+      this.updateSystemStatus();
       this.startSystemStatusUpdate();
     } else {
       this.stopSystemStatusUpdate();
@@ -154,11 +189,11 @@ export default class MeasureScrn extends React.Component {
     return stringState;
   }
   onPressOnButton() {
-    if (
+  /*  if (
       // eslint-disable-next-line no-bitwise
-      (this.state.systemStatus.motorState === Status.OFF) &
+      (this.state.systemStatus.motorState === Status.OFF) &&
       (this.state.systemStatus.powerState === Status.ON)
-    ) {
+    ) { */
       this.stopSystemStatusUpdate();
       this.setState({
         showProgressModal: true,
@@ -198,11 +233,11 @@ export default class MeasureScrn extends React.Component {
             },
           );
         });
-    } else if (this.state.systemStatus.motorState === Status.ON) {
+    /*} else if (this.state.systemStatus.motorState === Status.ON) {
       Toast.show(strings('motorAlreadyOn'), Toast.SHORT, Toast.CENTER);
     } else if (this.state.systemStatus.powerState === Status.OFF) {
       Toast.show(strings('0x00000019'), Toast.SHORT, Toast.CENTER);
-    }
+    }*/
   }
   onPressOffButton() {
     if (this.state.systemStatus.motorState === Status.ON) {

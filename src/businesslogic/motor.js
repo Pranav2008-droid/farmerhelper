@@ -89,7 +89,18 @@ export default class Motor {
         await MotorApi.updateSystemStatus();
         resolve();
       } catch (error) {
-        console.log('Motor.turnOn: Error while sending confirmStart ' + error);
+        console.log('Motor.updateSystemStatus: Error while updating system status ' + error);
+        reject(error);
+      }
+    });
+  }
+  static getSystemStatus() {
+    return new Promise(async (resolve, reject) => {
+      try {
+        var systemStatus = await MotorApi.getSystemStatus();
+        resolve(systemStatus);
+      } catch (error) {
+        console.log('Motor.getSystemStatus: Error while getting system status ' + error);
         reject(error);
       }
     });
