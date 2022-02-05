@@ -1,7 +1,5 @@
-
 #include <ArduinoJson.h>
 #include <WiFi.h>
-#include <IOXhop_FirebaseESP32.h>
 #include <HTTPClient.h>
 #include <ESP32Ping.h>
 
@@ -53,7 +51,13 @@ void debugPrintFunc(int level, String func, int line, const String  &msg) {
 #define debugPrintln(level, msg)
 #endif
 
-#define FIREBASE_HOST "farmerhelper-70abb.firebaseio.com"
+#if CONFIG_FREERTOS_UNICORE
+#define ARDUINO_RUNNING_CORE 0
+#else
+#define ARDUINO_RUNNING_CORE 1
+#endif
+
+#define FIREBASE_HOST ""
 #define FIREBASE_AUTH ""
 #define WIFI_SSID "AgriAutomation"
 #define WIFI_PASSWORD ""
@@ -69,8 +73,12 @@ const String STARTUP_URL = "/startup";
 #define WIFI_RECONNECT_INTERVAL 30000 //Milliseconds
 #define FSTREAM_KEEP_ALIVE_INTERVAL 30000 //Milliseconds
 #define HARDRESTART_TIMEOUT 1800000 //30 Minutes in milliseconds
+#define FIREBASE_STREAM_STACK_SIZE 16384
+#define STREAM_JSON_BUFFER_SIZE 1024
+#define STREAM_JSON_DATA_BUFFER_SIZE 1024
+#define HEAP_MIN_THRESHOLD 100000 // If the heap size goes below this limit, board is rebooted
 
-#ifdef DEBUG
+#ifdef DEBUG1
 #define WIFI_CONNECT_WAIT_TIME 1 //Seconds
 #define SYSTEM_STATUS_UPDATE_INTERVAL 20000 //milliseconds
 #else
@@ -88,11 +96,107 @@ typedef struct __SystemStatus SystemStatus;
 
 SystemStatus sysStatus;
 HTTPClient http;
+HTTPClient firebaseHttpStream;
+WiFiClient *firebaseStreamSocket;
+TaskHandle_t firebaseStreamTaskHandle;
+
 unsigned long lastWifiReconnectTime = 0;
 unsigned long lastSystemUpdateReqTimestamp = 0;
 unsigned long lastSystemStatusUpdateTime = 0;
 unsigned long lastFStreamKeepAliveTime = 0;
 
+String getUrl(String path) {
+  String url = "";
+
+  url += "https://";
+  url += FIREBASE_HOST;
+  url += "/" + path + ".json?auth=";
+  url += FIREBASE_AUTH;
+  
+  return url;
+}
+void firebaseStreamCallback(String &event, String &data)
+{
+    String path;
+    StaticJsonBuffer<STREAM_JSON_BUFFER_SIZE> jsonBuffer;
+    JsonObject &root = jsonBuffer.parseObject(data);
+    if (root.success()) {
+      if (root.containsKey("path") && root.containsKey("data")) {
+        path = root["path"].as<String>();
+        data = root["data"].as<String>();
+      }
+    }
+
+    unsigned long currentMillis = millis();
+    lastFStreamKeepAliveTime = currentMillis;
+
+    event.toLowerCase();
+
+    debugPrint(INFO, "Stream Event:");
+    debugPrintln(NONE, event);
+
+    if (event == "put") {
+      debugPrint(INFO, "Stream Event Path:");
+      debugPrintln(NONE, path);
+      debugPrintln(NONE, data);
+
+      handleCmdRequests(data);
+    }
+    if (event == "keep-alive") {
+      if ((currentMillis - lastSystemStatusUpdateTime) >= SYSTEM_STATUS_UPDATE_INTERVAL) {
+        updateSystemStatus();
+      }
+    }
+}
+void initFirebaseStream() {
+
+    xTaskCreatePinnedToCore([](void* param) {
+    String event;
+    String data;
+        for (;;) {
+            delay(5); // Disable WDT
+                
+            if (!firebaseHttpStream.connected()) {
+                firebaseHttpStream.end();
+                firebaseHttpStream.begin(getUrl(CMD_URL));
+                firebaseHttpStream.setTimeout(5000);
+                firebaseHttpStream.addHeader("Accept", "text/event-stream");
+                int httpCode = firebaseHttpStream.GET();
+                if (httpCode != HTTP_CODE_OK) {
+                    Serial.println("Error !, Firebase stream fail: " + String(httpCode));
+          delay(5000);
+                    continue;
+                }
+                firebaseStreamSocket = firebaseHttpStream.getStreamPtr();
+            }
+            
+            if (!firebaseStreamSocket) continue;
+            
+            if (firebaseStreamSocket->available()) {
+                String line = firebaseStreamSocket->readStringUntil('\n');
+                if (line.startsWith("event:")) {
+                    event = line.substring(7, line.length());
+                    event.trim();
+                } else if (line.startsWith("data:")) {
+                    data = line.substring(6, line.length());
+                    data.trim();
+                } else if (line.length() == 0) {
+                    firebaseStreamCallback(event, data);
+                }
+            }
+        }
+        vTaskDelete(NULL);
+        firebaseStreamTaskHandle = NULL;
+    }, "FirebaseStream_Task", FIREBASE_STREAM_STACK_SIZE, NULL, 3, &firebaseStreamTaskHandle, ARDUINO_RUNNING_CORE);
+    return;
+}
+
+void stopFirebaseStream() {
+    if (firebaseStreamTaskHandle) vTaskDelete(firebaseStreamTaskHandle);
+    if (firebaseHttpStream.connected()) {
+        firebaseHttpStream.end();
+    }
+}
 long getServerTimeStamp(){
 
   String response;
@@ -102,14 +206,14 @@ long getServerTimeStamp(){
   int statusCode = 0;
   long timeStamp = 0;
 
- 	http.addHeader("Content-Type", "application/json");
-
   url += "https://";
   url += FIREBASE_HOST;
   url += "/timestamp.json?auth=";
   url += FIREBASE_AUTH;
   
   http.begin(url);
+
+  http.addHeader("Content-Type", "application/json");
 
   statusCode = http.PUT(data);
   if (statusCode != HTTP_CODE_OK) {
@@ -127,6 +231,7 @@ long getServerTimeStamp(){
   timeStamp = getTimeStamp(response);
 
 out:
+  http.end();
   return timeStamp;
 }
 /*
@@ -153,13 +258,13 @@ bool postToFirebase( const String & path , const String & data) {
   String url = "";
   bool result = false;
 
- 	http.addHeader("Content-Type", "application/json");
-
   url += "https://";
   url += FIREBASE_HOST;
   url += "/" + path + ".json?auth=";
   url += FIREBASE_AUTH;
   http.begin(url);
+
+  http.addHeader("Content-Type", "application/json");
 
   debugPrintln(INFO, "Data: " + data);
 
@@ -167,13 +272,14 @@ bool postToFirebase( const String & path , const String & data) {
   if (statusCode != HTTP_CODE_OK) {
     debugPrint(ERR, "Error while writing data to firebase. Error code: ");
     debugPrint(NONE, statusCode);
-    debugPrint(NONE, "Error text: ");
+    debugPrint(NONE, " Error text: ");
     debugPrintln(NONE, http.errorToString(statusCode));
     debugPrintln(NONE, "Data: " + data);
   } else {
     debugPrintln(INFO, "Posted data to firebase successfully.");
     result = true;
   }
+  http.end();
   return result;
 }
 void prepareMotorStart(const String &strCmd){
@@ -319,52 +425,20 @@ void handleCmdRequests(String &strCmd)
     //handleUpdateSystemStatus(strCmd);
   }
 }
-void firebaseStreamCallback(FirebaseStream stream)
-{
-    String eventType = stream.getEvent();
-    unsigned long currentMillis = millis();
-    lastFStreamKeepAliveTime = currentMillis;
 
-    eventType.toLowerCase();
-     
-    debugPrint(INFO, "Stream Event:");
-    debugPrintln(NONE, eventType);
-
-    if (eventType == "put") {
-      String path = stream.getPath();
-      String data = stream.getDataString();
-
-      debugPrint(INFO, "Stream Event Path:");
-      debugPrintln(NONE, path);
-
-      debugPrint(INFO, "Stream Event Data:");
-      debugPrintln(NONE, data);
-
-      handleCmdRequests(data);
-    }
-    if (eventType == "keep-alive") {
-      if ((currentMillis - lastSystemStatusUpdateTime) >= SYSTEM_STATUS_UPDATE_INTERVAL) {
-        updateSystemStatus();
-      }
-    }
-}
-void initFirebaseStream()
+/* void initFirebaseStream()
 {
   Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
   Firebase.stream("/command", firebaseStreamCallback);
   lastFStreamKeepAliveTime = millis();
-}
+} 
 void stopFirebaseStream()
 {
   Firebase.stopStream();
-}
+}*/
 void initHttpClient()
 {
   http.setReuse(true);
-}
-void uninitHttpClient()
-{
-  http.end();
 }
 
 void setup() {
@@ -486,8 +560,6 @@ void checkStatus()
   }
   
   if (reconnectWifi) {
-    debugPrintln(INFO, "Uninitialize http");
-    uninitHttpClient();
     debugPrintln(INFO, "Stop firebase stream before wifi reconnect");
     stopFirebaseStream();
     debugPrintln(INFO, "Disconect wifi before reconnect");
@@ -518,5 +590,9 @@ void checkStatus()
 }
 void loop() {
   checkStatus();
-  delay(500);
+  delay(5000);
+  if (ESP.getFreeHeap() < HEAP_MIN_THRESHOLD) {
+    debugPrintln(INFO, "Heap is low. Restarting.. ");
+    ESP.restart();
+  }
 }
