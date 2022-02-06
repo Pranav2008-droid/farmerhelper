@@ -57,10 +57,10 @@ void debugPrintFunc(int level, String func, int line, const String  &msg) {
 #define ARDUINO_RUNNING_CORE 1
 #endif
 
-#define FIREBASE_HOST "farmerhelper-70abb.firebaseio.com"
-#define FIREBASE_AUTH "nJSuwZ2Qlg4A8s0rvHnnlq7zcu1uWRBGN33gCJAk"
+#define FIREBASE_HOST ""
+#define FIREBASE_AUTH ""
 #define WIFI_SSID "AgriAutomation"
-#define WIFI_PASSWORD "pranprit2723"
+#define WIFI_PASSWORD ""
 
 const String CMD_URL = "/command";
 const String TMSTAMP_URL = "/timestamp";
@@ -731,8 +731,8 @@ void loop() {
   checkStatus();
   updateLocalSystemStatus();
   delay(3000);
-  debugPrint(INFO, "Heap = ")
-  debugPrintln(NONE, ESP.getFreeHeap());
+  debugPrint(INFO, "Heap = ");
+  debugPrintln(NONE, (long)ESP.getFreeHeap());
   if (ESP.getFreeHeap() < HEAP_MIN_THRESHOLD) {
     debugPrintln(INFO, "Heap is low. Restarting.. ");
     ESP.restart();
