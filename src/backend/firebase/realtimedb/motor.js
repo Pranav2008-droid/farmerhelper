@@ -1,13 +1,14 @@
 import database from '@react-native-firebase/database';
-const prefix = 'test'
+const prefix = ''
 export default class MotorApi {
-  static prepareStart() {
+  static prepareStart(runSchedule) {
     const dbRef = database().ref(prefix + '/');
     return dbRef.update({
       command: {
         request: 'prepareStart',
         response: '',
-        timestamp: database.ServerValue.TIMESTAMP,
+        runSchedule: runSchedule,
+        timestamp: database.ServerValue.TIMESTAMP
       },
     });
   }
@@ -22,13 +23,14 @@ export default class MotorApi {
       }
     });
   }
-  static confirmStart() {
+  static confirmStart(runSchedule) {
     const dbRef = database().ref(prefix + '/');
     return dbRef.update({
       command: {
         request: 'confirmStart',
         response: '',
-        timestamp: database.ServerValue.TIMESTAMP,
+        runSchedule: runSchedule,
+        timestamp: database.ServerValue.TIMESTAMP
       },
     });
   }

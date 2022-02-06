@@ -1,14 +1,14 @@
 import {MotorApi} from '../backend';
 
 export default class Motor {
-  static turnOn() {
+  static turnOn(runSchedule) {
     return new Promise(async (resolve, reject) => {
       var readyStateListenerObj = null;
       var readyStateListenerTimeout = null;
 
       //Step 1: Send the prepare request to raspberry pi (through database)
       try {
-        await MotorApi.prepareStart();
+        await MotorApi.prepareStart(runSchedule);
       } catch (error) {
         console.log('Motor.turnOn: Error while sending prepareStart ' + error);
         reject(error);
@@ -22,7 +22,7 @@ export default class Motor {
 
           //Step 3: Send confirmation request to raspberry pi(through databse)
           try {
-            await MotorApi.confirmStart();
+            await MotorApi.confirmStart(runSchedule);
             resolve();
           } catch (error) {
             console.log(

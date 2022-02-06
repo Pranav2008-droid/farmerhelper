@@ -14,13 +14,15 @@ export default {
   phase2BackgroundColor: 'lightgray',
   phase1Color: 'red',
   phase1BackgroundColor: 'lightgray',
-  motorStatusOnButton: 'green',
-  motorStatusOffButton: 'red',
+  motorStatusOnButton: '#1a9274',
+  motorStatusOffButton: '#C1423F',
 
   validationIconError: '#ad3d3c',
   validationIconSuccess: 'green',
   buttons: {
     borderColor: 'lightgray',
   },
+  appGreen: '#1a9274',
+  appRed: '#C1423F',
   progressIndicator: '#0073B6',
 };

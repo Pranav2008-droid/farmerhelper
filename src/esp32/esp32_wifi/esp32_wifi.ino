@@ -57,14 +57,15 @@ void debugPrintFunc(int level, String func, int line, const String  &msg) {
 #define ARDUINO_RUNNING_CORE 1
 #endif
 
-#define FIREBASE_HOST ""
-#define FIREBASE_AUTH ""
+#define FIREBASE_HOST "farmerhelper-70abb.firebaseio.com"
+#define FIREBASE_AUTH "nJSuwZ2Qlg4A8s0rvHnnlq7zcu1uWRBGN33gCJAk"
 #define WIFI_SSID "AgriAutomation"
-#define WIFI_PASSWORD ""
+#define WIFI_PASSWORD "pranprit2723"
 
 const String CMD_URL = "/command";
 const String TMSTAMP_URL = "/timestamp";
 const String STARTUP_URL = "/startup";
+const String SYS_STATUS_URL = "/systemStatus";
 
 #define ON 1
 #define OFF 0
@@ -77,6 +78,8 @@ const String STARTUP_URL = "/startup";
 #define STREAM_JSON_BUFFER_SIZE 1024
 #define STREAM_JSON_DATA_BUFFER_SIZE 1024
 #define HEAP_MIN_THRESHOLD 100000 // If the heap size goes below this limit, board is rebooted
+#define MAX_MOTOR_RUN_TIME 240 //4 hours
+#define SYS_STATUS_BUF_SIZE 1024
 
 #ifdef DEBUG1
 #define WIFI_CONNECT_WAIT_TIME 1 //Seconds
@@ -88,11 +91,28 @@ const String STARTUP_URL = "/startup";
 
 #define RELAY 2
 
-struct __SystemStatus{
-  int motorState;
-  int powerState;
-};
-typedef struct __SystemStatus SystemStatus;
+typedef struct __State {
+  short state;
+  /* Specifies the duration of the current state */
+  short durationInThisState;
+  unsigned long motorStateChangeTime; 
+} State;
+typedef struct __MotorState {
+  State motorState;
+  /* Specifies scheduled run time */
+  short runSchedule;
+  /*
+   * Specifies the motor runtime.
+   * Note:- When the motor state is off, then this specifies the
+   * last running duration of the motor.
+   */
+  short runTime;
+} MotorState;
+
+typedef struct __SystemStatus {
+  MotorState motor;
+  State power;
+} SystemStatus;
 
 SystemStatus sysStatus;
 HTTPClient http;
@@ -114,6 +134,30 @@ String getUrl(String path) {
   url += FIREBASE_AUTH;
   
   return url;
+}
+bool readFromFirebase(const String & path, String &response) {
+  int statusCode = 0;
+  bool result = false;
+  String url = getUrl(path);
+
+  String contentType = "application/json";
+
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");  
+  statusCode = http.GET();
+  if (statusCode != HTTP_CODE_OK) {
+    debugPrint(ERR, "Error while reading from firebase. Error code: ");
+    debugPrint(NONE, statusCode);
+    debugPrint(NONE, " Error text: ");
+    debugPrintln(NONE, http.errorToString(statusCode));
+    debugPrintln(NONE, "Path: " + url);
+    result = false;
+  } else {
+    response = http.getString();
+    result = true;
+  }
+  http.end();
+  return result;
 }
 void firebaseStreamCallback(String &event, String &data)
 {
@@ -164,7 +208,7 @@ void initFirebaseStream() {
                 int httpCode = firebaseHttpStream.GET();
                 if (httpCode != HTTP_CODE_OK) {
                     Serial.println("Error !, Firebase stream fail: " + String(httpCode));
-          delay(5000);
+                    delay(5000);
                     continue;
                 }
                 firebaseStreamSocket = firebaseHttpStream.getStreamPtr();
@@ -304,26 +348,36 @@ void prepareMotorStart(const String &strCmd){
 }
 void updateSystemStatus(){
     
-  String url("/systemStatus");
-
   String jsonData = "{"
-    "\"motorState\":<motorState>,"
+    "\"motorState\":{"
+        "\"runTime\":<runTime>,"
+        "\"runSchedule\":<runSchedule>,"
+        "\"state\":<motorState>,"
+        "\"durationInThisState\":<durationInThisState>"
+    "},"
     "\"powerState\":<powerState>,"
     "\"timestamp\":{\".sv\":\"timestamp\"}"
   "}";
 
-  jsonData.replace("<motorState>",String(sysStatus.motorState));
-  jsonData.replace("<powerState>",String(sysStatus.powerState));
+  jsonData.replace("<runTime>",String(sysStatus.motor.runTime));
+  jsonData.replace("<runSchedule>",String(sysStatus.motor.runSchedule));
+  jsonData.replace("<motorState>",String(sysStatus.motor.motorState.state));
+  jsonData.replace("<durationInThisState>",String(sysStatus.motor.motorState.durationInThisState));
+  jsonData.replace("<powerState>",String(sysStatus.power.state));
 
-  if (postToFirebase(url, jsonData)) {
+  if (postToFirebase(SYS_STATUS_URL, jsonData)) {
     lastSystemStatusUpdateTime = millis();
   }
 }
 void turnOnMotor(){
-  if (sysStatus.motorState == ON) {
+  if (sysStatus.motor.motorState.state == ON) {
     debugPrintln(INFO, "Motor is already on");
   }
-  sysStatus.motorState = ON;
+  sysStatus.motor.motorState.state = ON;
+  sysStatus.motor.motorState.durationInThisState = 0;
+  sysStatus.motor.runTime = 0;
+  sysStatus.motor.motorState.motorStateChangeTime = millis();
+
   digitalWrite(RELAY, LOW);
   updateSystemStatus();
   String jsonData = "{"
@@ -336,10 +390,13 @@ void turnOnMotor(){
   debugPrintln(INFO, "Motor successfully turned on");
 }
 void turnOffMotor(){
-  if (sysStatus.motorState == OFF) {
+  if (sysStatus.motor.motorState.state == OFF) {
     debugPrintln(INFO, "Motor is already off");
   }
-  sysStatus.motorState = OFF;
+  sysStatus.motor.motorState.state = OFF;
+  sysStatus.motor.motorState.durationInThisState = 0;
+  sysStatus.motor.motorState.motorStateChangeTime = millis();
+
   digitalWrite(RELAY,HIGH);
   updateSystemStatus();    
   String jsonData = "{"
@@ -350,12 +407,17 @@ void turnOffMotor(){
   postToFirebase(CMD_URL,jsonData);
   debugPrintln(INFO, "Motor successfully turned off");
 }
-void confirmMotorStart(const String &strCmd){
+void confirmMotorStart(const String &strCmd, JsonObject &jsonCmd) {
   long currentServerTimestamp = 0;
   long requestTimestamp = 0;
 
   requestTimestamp = getTimeStamp1(strCmd);
   currentServerTimestamp = getServerTimeStamp();
+  if (jsonCmd.containsKey("runSchedule")) {
+    sysStatus.motor.runSchedule = jsonCmd["runSchedule"].as<unsigned short>();
+    debugPrint(INFO, "sysStatus.motor.runSchedule = ");
+    debugPrintln(NONE, sysStatus.motor.runSchedule);
+  }
   if ((currentServerTimestamp - requestTimestamp) <= CMD_REQUEST_TIMEOUT){
     turnOnMotor();
   } else {
@@ -409,7 +471,7 @@ void handleCmdRequests(String &strCmd)
    prepareMotorStart(strCmd);
   }
   if (request.equals("confirmStart")) {
-    confirmMotorStart(strCmd);
+    confirmMotorStart(strCmd, root);
   }
   if (request.equals("stop")) {
     handleMotorStop(strCmd);
@@ -441,6 +503,40 @@ void initHttpClient()
   http.setReuse(true);
 }
 
+void initializeSystemStatus() {
+
+  String response;
+  StaticJsonBuffer<STREAM_JSON_BUFFER_SIZE> jsonBuffer;
+
+  sysStatus.motor.runSchedule = 0;
+  sysStatus.motor.runTime = 0;
+  sysStatus.motor.motorState.state = OFF;
+  sysStatus.motor.motorState.durationInThisState = 0;
+  sysStatus.power.state = ON;
+
+  /*
+   * Read status from firebase. We need to retain the last known runSchdule and runTime
+   * This is needed to show the use about the remaining schedule time in case if the
+   * motor is turned off due to power outage or esp32 reboot.
+   */
+  if (readFromFirebase(SYS_STATUS_URL, response)) {
+    debugPrint(INFO, "System status read from firestore: ");
+    debugPrintln(NONE, response);
+    JsonObject &root = jsonBuffer.parseObject(response);
+    if (root.success()) {
+      if (root.containsKey("motorState")) {
+        JsonObject &motorState = root["motorState"].as<JsonObject>();
+        sysStatus.motor.runSchedule = motorState["runTime"].as<unsigned short>();
+        sysStatus.motor.runTime = motorState["runSchedule"].as<unsigned short>();
+        debugPrint(INFO, "motor.runSchedule = ");
+        debugPrintln(NONE, sysStatus.motor.runSchedule);
+        debugPrint(INFO, "motor.runTime = ");
+        debugPrintln(NONE, sysStatus.motor.runTime);
+      }
+    }
+  }
+
+}
 void setup() {
   int count = WIFI_CONNECT_WAIT_TIME;
   Serial.begin(115200);
@@ -449,8 +545,8 @@ void setup() {
   pinMode(RELAY, OUTPUT);
   digitalWrite(RELAY, HIGH);
 
-  sysStatus.motorState = OFF;
-  sysStatus.powerState = ON;
+  sysStatus.motor.motorState.state = OFF;
+  sysStatus.power.state = ON;
 
   //Wait for 70 seconds for wifi to be available
   /* debugPrintln(INFO, "Waiting for 90 seconds for wifi to be available...");
@@ -482,6 +578,8 @@ void setup() {
 
   initHttpClient();
 
+  initializeSystemStatus();
+
   updateSystemStatus();    
 
   String jsonData = "{"
@@ -508,9 +606,9 @@ void setup() {
 }
 void checkStatus()
 {
-  unsigned long currentMillis = millis();
   int count = 0;
   bool reconnectWifi = false;
+  unsigned long currentMillis = millis();
 
 
   if ((currentMillis - lastWifiReconnectTime) < WIFI_RECONNECT_INTERVAL) {
@@ -585,12 +683,56 @@ void checkStatus()
       initHttpClient();
       initFirebaseStream();
     }
-    lastWifiReconnectTime = currentMillis;
+    lastWifiReconnectTime = millis();
+    lastFStreamKeepAliveTime = lastWifiReconnectTime;
   }
 }
+void updateLocalSystemStatus() {
+  bool updateSysStatusToServer = false;
+  unsigned long currentMillis = millis();
+  sysStatus.motor.motorState.durationInThisState = 
+            (currentMillis - sysStatus.motor.motorState.motorStateChangeTime)/1000/60;
+  debugPrint(INFO, "Motor State = ");
+  debugPrintln(NONE, sysStatus.motor.motorState.state);
+  debugPrint(INFO, "durationInThisState = ");
+  debugPrintln(NONE, sysStatus.motor.motorState.durationInThisState);
+
+  if (sysStatus.motor.motorState.state == ON) {
+    if (sysStatus.motor.runTime == 0 && 
+      sysStatus.motor.motorState.durationInThisState == 1 &&
+      sysStatus.motor.runSchedule == 0) {
+        /*
+         * Update the motor status to firebase if 1 minute is elapsed
+         * since motor was on.
+         * This will help the mobile app to show how long the motor has
+         * been running. 
+         * This is needed only for non-scheduled run.
+         */
+        updateSysStatusToServer = true;
+    }
+    sysStatus.motor.runTime = sysStatus.motor.motorState.durationInThisState;
+    if (updateSysStatusToServer) {
+      updateSystemStatus();
+    }
+    /*
+    * Turn off the motor if the scheduled time is elapsed or 
+    * MAX_MOTOR_RUN_TIME is elapsed.
+    */
+    if ((sysStatus.motor.runSchedule > 0 && 
+          sysStatus.motor.runTime >= sysStatus.motor.runSchedule) ||
+        sysStatus.motor.runTime >= MAX_MOTOR_RUN_TIME) {
+        turnOffMotor();
+    }
+  }
+
+}
 void loop() {
+  unsigned long currentMillis = millis();
   checkStatus();
-  delay(5000);
+  updateLocalSystemStatus();
+  delay(3000);
+  debugPrint(INFO, "Heap = ")
+  debugPrintln(NONE, ESP.getFreeHeap());
   if (ESP.getFreeHeap() < HEAP_MIN_THRESHOLD) {
     debugPrintln(INFO, "Heap is low. Restarting.. ");
     ESP.restart();

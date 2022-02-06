@@ -6,9 +6,12 @@
   "entertheotp" : "Enter the OTP",
   "enterthecode" : "enter the code",
   "voltageLevel" : "Voltage Level",
-  "motorStatus" : "Motor Status: ",
+  "motorStatus1" : "Motor Status: ",
+  "motorStatus2" : "Motor Status: ",
   "on": "On",
   "off": "Off",
+  "present" : "Present",
+  "notPresent" : "Not Present",
   "onLabel": "On",
   "offLabel": "Off",
   "errUnableToSendOtp": "Unable to send OTP",
@@ -30,4 +33,14 @@
   "0x0000001A":  "Motor is successfully turned off",
   "0x0000001B": "Turning motor off...wait",
   "0x0000001C":  "Unable to turn off the motor, try again",
+  "%{hours} hours" : "%{hours} hours",
+  "%{minutes} minutes" : "%{minutes} minutes",
+  "Minimum schedule is %{minSchedule}": "Minimum schedule is %{minSchedule}",
+  "Scheduled for %{scheduleTime}" : "Scheduled for %{scheduleTime}",
+  "%{balanceSchedule} remaining" : "%{balanceSchedule} remaining",
+  "Running for": "Running for",
+  "Runs untill stopped" : "Runs untill stopped",
+  "Runs for %{scheduleTime}": "Runs for %{scheduleTime}",
+  "Started just now": "Started just now"
+
 }

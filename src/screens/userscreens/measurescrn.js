@@ -1,6 +1,7 @@
 import React from 'react';
 import * as rn from 'react-native';
-import Toast from 'react-native-simple-toast';
+//import Toast from 'react-native-simple-toast';
+import {Slider} from '@miblanchard/react-native-slider';
 import {AnimatedCircularProgress} from 'react-native-circular-progress';
 import * as themes from '../../themes';
 import {strings} from '../../i18n';
@@ -11,7 +12,9 @@ import {diff} from 'react-native-reanimated';
 
 var Types = require('../../common/types');
 var Status = Types.Status;
-
+const minRunSchedule = 10;
+const defaultRunSchedule = 30;
+const maxRunSchedule = 120;
 export default class MeasureScrn extends React.Component {
   constructor() {
     super();
@@ -20,13 +23,20 @@ export default class MeasureScrn extends React.Component {
       phase2: 210,
       phase3: 250,
       systemStatus: {
-        motorState: Status.NA,
+        motorState: {
+          durationInThisState: 0,
+          runSchedule: 0,
+          runTime: 0,
+          state: Status.NA
+        },
         powerState: Status.NA,
       },
       showProgressModal: false,
       showInitialProgressModal: true,
       progressMessage: strings('0x00000017'),
       lastUpdatedTime: null,
+      runSchedule: defaultRunSchedule,
+      runScheduleModified: false
     };
     this.globalSize = 1.8;
     this.maxVoltage = 440;
@@ -35,6 +45,13 @@ export default class MeasureScrn extends React.Component {
     this.lastUpdatedTimeRefresher = null;
     this.refreshLastUpdatedTime = this.refreshLastUpdatedTime.bind(this);
     this.handleAppStateChange = this.handleAppStateChange.bind(this);
+    this.runSchedulerIntervals = [];
+    for (var schedule = 0; schedule <= maxRunSchedule; schedule += 30) {
+      this.runSchedulerIntervals.push(schedule);
+    }
+    if (this.runSchedulerIntervals[this.runSchedulerIntervals.length - 1] !== maxRunSchedule) {
+      this.runSchedulerIntervals.push(maxRunSchedule);
+    }
   }
   componentDidMount() {
     const self = this;
@@ -47,9 +64,26 @@ export default class MeasureScrn extends React.Component {
     rn.AppState.addEventListener('change', this.handleAppStateChange);
   }
   setSystemStatus(status) {
+    var runSchedule = this.state.runSchedule;
+    if (!this.state.runScheduleModified) {
+      /*
+       * If the user has not changed the run schedule, set the schedule received from the
+       * server.
+       * 
+       * Note:- If the scedule received from server is less than minRunSchedule, set it to
+       * defaultRunSchedule.
+       */
+      var runScheduleFromServer = status.motorState.runSchedule - status.motorState.runTime;
+      if ( runScheduleFromServer > minRunSchedule) {
+        runSchedule = status.motorState.runSchedule - status.motorState.runTime;
+      } else {
+        runSchedule = defaultRunSchedule;
+      }
+    }
     this.setState(
       {
         systemStatus: status,
+        runSchedule,
         showInitialProgressModal: false,
       },
       () => {
@@ -189,17 +223,21 @@ export default class MeasureScrn extends React.Component {
     return stringState;
   }
   onPressOnButton() {
-  /*  if (
-      // eslint-disable-next-line no-bitwise
-      (this.state.systemStatus.motorState === Status.OFF) &&
+    if (
+      (this.state.systemStatus.motorState.state === Status.OFF) &&
       (this.state.systemStatus.powerState === Status.ON)
-    ) { */
+    ) {
+      if (this.state.runSchedule > 0 && this.state.runSchedule < minRunSchedule) {
+        alert(strings('Minimum schedule is %{minSchedule}',
+        {minSchedule: this.getDurationDisplayText(minRunSchedule)}))
+        return;
+      }
       this.stopSystemStatusUpdate();
       this.setState({
         showProgressModal: true,
         progressMessage: strings('0x0000000F'),
       });
-      Motor.turnOn()
+      Motor.turnOn(this.state.runSchedule)
         .then(() => {
           this.startSystemStatusUpdate();
           this.setState(
@@ -208,11 +246,18 @@ export default class MeasureScrn extends React.Component {
               progressMessage: null,
               systemStatus: {
                 ...this.state.systemStatus,
-                motorState: Status.ON,
+                motorState: 
+                {
+                  ...this.state.systemStatus.motorState,
+                  state: Status.ON,
+                  runTime: 0,
+                  runSchedule: this.state.runSchedule,
+                  runScheduleModified: false
+                }
               },
             },
             () => {
-              Toast.show(strings('0x00000011'), Toast.SHORT, Toast.CENTER);
+              //alert(strings('0x00000011'));
             },
           );
         })
@@ -223,24 +268,28 @@ export default class MeasureScrn extends React.Component {
             {
               systemStatus: {
                 ...this.state.systemStatus,
-                motorState: Status.OFF,
+                motorState: 
+                {
+                  ...this.state.systemStatus.motorState,
+                  state: Status.OFF
+                }
               },
               showProgressModal: false,
               progressMessage: null,
             },
             () => {
-              Toast.show(strings('0x00000010'), Toast.SHORT, Toast.CENTER);
+              alert(strings('0x00000010'));
             },
           );
         });
-    /*} else if (this.state.systemStatus.motorState === Status.ON) {
-      Toast.show(strings('motorAlreadyOn'), Toast.SHORT, Toast.CENTER);
+    } else if (this.state.systemStatus.motorState.state === Status.ON) {
+      alert(strings('motorAlreadyOn'));
     } else if (this.state.systemStatus.powerState === Status.OFF) {
-      Toast.show(strings('0x00000019'), Toast.SHORT, Toast.CENTER);
-    }*/
+      alert(strings('0x00000019'));
+    }
   }
   onPressOffButton() {
-    if (this.state.systemStatus.motorState === Status.ON) {
+    if (this.state.systemStatus.motorState.state === Status.ON) {
       this.stopSystemStatusUpdate();
       this.setState({
         showProgressModal: true,
@@ -253,13 +302,17 @@ export default class MeasureScrn extends React.Component {
             {
               systemStatus: {
                 ...this.state.systemStatus,
-                motorState: Status.OFF,
+                motorState: 
+                {
+                  ...this.state.systemStatus.motorState,
+                  state: Status.OFF
+                }
               },
               showProgressModal: false,
               progressMessage: null,
             },
             () => {
-              Toast.show(strings('0x0000001A'), Toast.SHORT, Toast.CENTER);
+              //alert(strings('0x0000001A'))
             },
           );
         })
@@ -270,19 +323,36 @@ export default class MeasureScrn extends React.Component {
             {
               systemStatus: {
                 ...this.state.systemStatus,
-                motorState: Status.ON,
+                motorState: 
+                {
+                  ...this.state.systemStatus.motorState,
+                  state: Status.ON
+                }
               },
               showProgressModal: false,
               progressMessage: null,
             },
             () => {
-              Toast.show(strings('0x0000001C'), Toast.SHORT, Toast.CENTER);
+              alert(strings('0x0000001C'));
             },
           );
         });
     } else {
-      Toast.show(strings('motorAlreadyOff'), Toast.SHORT, Toast.CENTER);
+      alert(strings('motorAlreadyOff'));
     }
+  }
+  getDurationDisplayText(duration) {
+    let hours = parseInt(duration / 60);
+    console.log('hours = ', hours);
+    let minutes = duration - (hours * 60);
+    let displayText = "";
+    if (hours > 0) {
+      displayText = strings('%{hours} hours', {hours}) + ' ';
+    }
+    if (minutes > 0) {
+      displayText += strings('%{minutes} minutes', {minutes});
+    }
+    return displayText;
   }
   renderMeter(value, color, backgroundColor, text) {
     // return (
@@ -307,6 +377,161 @@ export default class MeasureScrn extends React.Component {
     //   </rn.View>
     // );
   }
+  renderMotorStatusView() {
+    var motorState = this.state.systemStatus.motorState.state;
+    return <rn.View style={styles.motorStatusView}>
+      <rn.View style={styles.motorStatus}>
+        <rn.Text style={styles.motorStatusText}>
+          {(motorState === Status.ON || motorState === Status.OFF) ? 
+            strings('motorStatus1') : strings('motorStatus2')}
+        </rn.Text>
+        <rn.Text
+          // eslint-disable-next-line react-native/no-inline-styles
+          style={{
+            ...styles.motorStatusText,
+            paddingLeft: wp(2),
+            color:
+            motorState === Status.ON
+              ? themes.colors.appGreen
+              : themes.colors.appRed,
+          }}>
+          {this.getStateString(motorState)}
+        </rn.Text>
+      </rn.View>
+    </rn.View>
+  }
+  renderMotorControlView() {
+    return (
+    <rn.View style={styles.motorControlView}>
+      <rn.TouchableOpacity
+        activeOpacity={0}
+        style={styles.onButton}
+        onPress={this.onPressOnButton.bind(this)}>
+        <rn.Text style={styles.onButtonText}>
+          {strings('onLabel')}
+        </rn.Text>
+      </rn.TouchableOpacity>
+      <rn.TouchableOpacity
+        activeOpacity={0}
+        style={styles.offButton}
+        onPress={this.onPressOffButton.bind(this)}>
+        <rn.Text style={styles.offButtonText}>
+          {strings('offLabel')}
+        </rn.Text>
+      </rn.TouchableOpacity>
+    </rn.View>
+    );
+  }
+  renderSliderTrackView(index) {
+    return <rn.TouchableOpacity
+    activeOpacity={1}
+    style={styles.sliderTrackText}
+    onPress={() => {
+      this.setState({
+        runSchedule: this.runSchedulerIntervals[index],
+        runScheduleModified: true
+      })
+    }}>
+      <rn.Text>
+        {(this.runSchedulerIntervals[index]/30)*0.5}
+      </rn.Text>
+    </rn.TouchableOpacity>
+
+  }
+  renderScheduleSliderView() {
+    var scheduleText;
+    var scheduleTime = this.state.runSchedule;
+    if (scheduleTime > 0) {
+      scheduleText = strings("Runs for %{scheduleTime}", 
+              {scheduleTime: this.getDurationDisplayText(scheduleTime)});
+    } else {
+      scheduleText = strings("Runs untill stopped");
+    }
+    return <rn.View style={styles.sliderContainer}>
+        <Slider
+            value={this.state.runSchedule}
+            onValueChange={value => {
+              this.setState({
+                runSchedule: value[0],
+                runScheduleModified: true
+              });
+            }}
+            step={1}
+            minimumValue={0}
+            maximumValue={maxRunSchedule}
+            minimumTrackTintColor={themes.colors.appGreen}
+            thumbStyle={styles.sliderThumb}
+            trackStyle={styles.sliderTrack}
+            trackClickable
+            trackMarks={this.runSchedulerIntervals}
+            renderTrackMarkComponent={this.renderSliderTrackView.bind(this)}
+        />
+        <rn.Text style={{margin:0, paddingTop: hp(40), paddingLeft: 0}}>
+          {scheduleText}
+        </rn.Text>
+      </rn.View>          
+  }
+  renderRunningTime(runingTimeTxt) {
+    return <rn.View style={styles.scheduleInfoTextView}>
+      <rn.Text>
+        {strings('Running for')}
+      </rn.Text>
+      <rn.Text style={{color: themes.colors.appGreen}}>
+        {runingTimeTxt}
+      </rn.Text>
+    </rn.View>
+  }
+  renderScheduleInfo(scheduleTimeTxt, remainingRuntimeTxt) {
+    return <rn.View style={styles.scheduleInfoTextView}>
+      <rn.Text>
+        {strings('Scheduled for %{scheduleTime}', {scheduleTime: scheduleTimeTxt})}
+      </rn.Text>
+      <rn.Text style={{color: themes.colors.appGreen}}>
+        {strings('%{balanceSchedule} remaining', {balanceSchedule: remainingRuntimeTxt})}
+      </rn.Text>
+    </rn.View>
+  }
+  /* 
+   * This is shown when the motor state is on and schedule is set
+   * This shows the actual scheuldle and the remining runtime from the
+   * schedule.
+   */
+  renderRunInfo() {
+    var {runSchedule, runTime} = this.state.systemStatus.motorState;
+    var remainingRuntimeTxt = this.getDurationDisplayText(runSchedule - runTime);
+    var scheduleTimeTxt = this.getDurationDisplayText(runSchedule);
+    var runingTimeTxt = this.getDurationDisplayText(runTime);
+    if (runSchedule === 0 && runTime === 0) {
+      runingTimeTxt = strings('Started just now');
+    }
+    return <rn.View style={styles.scheduleInfoContainer}>
+        {runSchedule > 0 && this.renderScheduleInfo(scheduleTimeTxt, remainingRuntimeTxt)}
+        {runSchedule === 0 && this.renderRunningTime(runingTimeTxt)}
+      </rn.View>      
+  }
+  renderRunSchedulerView() {
+    return (
+      <rn.View style={styles.runSchedulerView}>
+        {this.state.systemStatus.motorState.state  === Status.OFF && this.renderScheduleSliderView()}
+        {this.state.systemStatus.motorState.state  === Status.ON && this.renderRunInfo()}
+      </rn.View>
+    );
+  }
+  renderBottomView() {
+    return <rn.View style={styles.bottomView}>
+    {this.renderMotorStatusView()}
+    {this.renderMotorControlView()}
+    {this.renderRunSchedulerView()}
+  </rn.View>
+
+  }
+  renderLastUpdatedView() {
+    return <rn.View style={styles.lastUpdatedView}>
+      <rn.Text style={styles.motorUpdatedText}>
+        {strings('0x00000012') + this.state.lastUpdatedTime}
+      </rn.Text>
+  </rn.View>    
+  }
   render() {
     return (
       <rn.View style={styles.container}>
@@ -319,10 +544,15 @@ export default class MeasureScrn extends React.Component {
                 ...styles.textStyle,
                 color:
                   this.state.systemStatus.powerState === Status.ON
-                    ? 'green'
-                    : 'red',
+                    ? themes.colors.appGreen
+                    : themes.colors.appRed,
               }}>
-              {this.getStateString(this.state.systemStatus.powerState)}
+              {
+                (this.state.systemStatus.powerState === Status.ON) && strings("present")
+              }
+              {
+                (this.state.systemStatus.powerState === Status.OFF) && strings("notPresent")
+              }
             </rn.Text>
           </rn.View>
           <rn.View style={styles.voltageMeterView}>
@@ -346,48 +576,8 @@ export default class MeasureScrn extends React.Component {
             )}
           </rn.View>
         </rn.View>
-
-        <rn.View style={styles.bottomView}>
-          <rn.View style={styles.motorTextView}>
-            <rn.View style={styles.motorStatus}>
-              <rn.Text style={styles.motorStatusText}>
-                {strings('motorStatus')}
-              </rn.Text>
-              <rn.Text
-                // eslint-disable-next-line react-native/no-inline-styles
-                style={{
-                  ...styles.motorStatusText,
-                  color:
-                    this.state.systemStatus.motorState === Status.ON
-                      ? 'green'
-                      : 'red',
-                }}>
-                {this.getStateString(this.state.systemStatus.motorState)}
-              </rn.Text>
-            </rn.View>
-            <rn.Text style={styles.motorUpdatedText}>
-              {strings('0x00000012') + this.state.lastUpdatedTime}
-            </rn.Text>
-          </rn.View>
-          <rn.View style={styles.motorStatusButtonView}>
-            <rn.TouchableOpacity
-              activeOpacity={0}
-              style={styles.onButton}
-              onPress={this.onPressOnButton.bind(this)}>
-              <rn.Text style={styles.onButtonText}>
-                {strings('onLabel')}
-              </rn.Text>
-            </rn.TouchableOpacity>
-            <rn.TouchableOpacity
-              activeOpacity={0}
-              style={styles.offButton}
-              onPress={this.onPressOffButton.bind(this)}>
-              <rn.Text style={styles.offButtonText}>
-                {strings('offLabel')}
-              </rn.Text>
-            </rn.TouchableOpacity>
-          </rn.View>
-        </rn.View>
+        {this.renderBottomView()}
+        {this.renderLastUpdatedView()}
         <ProgressDialog
           isVisible={
             this.state.showProgressModal || this.state.showInitialProgressModal
@@ -455,11 +645,7 @@ const styles = rn.StyleSheet.create({
     fontFamily: themes.fonts.medium1,
     color: themes.colors.primaryFg2,
     fontSize: wp(20),
-  },
-  motorUpdatedText: {
-    fontSize: wp(12),
-    fontFamily: themes.fonts.medium1,
-    color: themes.colors.primaryFg2,
+    padding: wp(3)
   },
   bottomView: {
     alignItems: 'center',
@@ -475,10 +661,29 @@ const styles = rn.StyleSheet.create({
     shadowRadius: 4.65,
     elevation: 10,
     marginBottom: wp(10),
-    flex: 0.9,
+    flex: 1.3,
+//    backgroundColor: 'black'
   },
-  motorTextView: {
+  motorStatusView: {
+    flex: 0.7,
+//    backgroundColor: 'red',
+    width: '100%',
     alignItems: 'center',
+    paddingTop: hp(10)
+  },
+  motorControlView: {
+    flex: 1,
+//    backgroundColor: 'yellow',
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+    width: '100%',
+  },
+  runSchedulerView: {
+    flex: 1,
+//    backgroundColor: 'green',
+    width: '100%',
+
   },
   onButton: {
     backgroundColor: themes.colors.motorStatusOnButton,
@@ -489,7 +694,7 @@ const styles = rn.StyleSheet.create({
     aspectRatio: 1,
   },
   onButtonText: {
-    fontSize: wp(20),
+    fontSize: wp(17),
     fontFamily: themes.fonts.medium1,
     color: themes.colors.primaryFg1,
   },
@@ -502,13 +707,64 @@ const styles = rn.StyleSheet.create({
     aspectRatio: 1,
   },
   offButtonText: {
-    fontSize: wp(20),
+    fontSize: wp(17),
     fontFamily: themes.fonts.medium1,
     color: themes.colors.primaryFg1,
   },
-  motorStatusButtonView: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
+  sliderContainer: {
+    flex: 1.2,
+    paddingLeft: 40,
+    paddingRight: 40,
+    justifyContent: 'center',
     width: '100%',
   },
+  scheduleInfoContainer: {
+    flex: 1,
+    paddingLeft: 50,
+    paddingRight: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  sliderTrackText: {
+    fontSize: wp(11),
+    paddingTop: hp(65),
+    fontFamily: themes.fonts.medium1,
+    color: themes.colors.primaryFg2,
+  },
+  sliderThumb: {
+      backgroundColor: '#363131',
+      borderRadius: 15,
+      height: 40,
+      width: 15,
+  },
+  sliderTrack: {
+      borderRadius: 10,
+      height: 18,
+  },  
+  scheduleInfoTextView: {
+    borderColor: 'gray',
+    width: '100%',
+    backgroundColor: '#d6d6d6',
+    borderWidth: 1,
+    borderRadius: 30,
+    padding: 10,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  motorUpdatedText: {
+    fontSize: wp(11),
+    paddingLeft: 15,
+    paddingBottom: 15,
+    fontFamily: themes.fonts.medium1,
+    color: themes.colors.primaryFg2,
+
+  },  
+  lastUpdatedView: {
+    alignItems: 'flex-start',
+    justifyContent: 'space-evenly',
+    flexDirection: 'column',
+    flex: 0.1,
+//    backgroundColor: 'black'
+  },    
 });
