@@ -63,22 +63,25 @@ export default class MeasureScrn extends React.Component {
     this.startSystemStatusUpdate();
     rn.AppState.addEventListener('change', this.handleAppStateChange);
   }
+  getRunSchedule(status) {
+    var runSchedule = defaultRunSchedule;
+    /*
+      * Note:- If the calculated run schedule is less than defaultRunSchedule, set it to
+      * defaultRunSchedule.
+      */
+    var runScheduleFromServer = status.motorState.runSchedule - status.motorState.runTime;
+    if ( runScheduleFromServer > defaultRunSchedule) {
+      runSchedule = status.motorState.runSchedule - status.motorState.runTime;
+    }
+    return runSchedule;
+  }
   setSystemStatus(status) {
     var runSchedule = this.state.runSchedule;
-    if (!this.state.runScheduleModified) {
-      /*
-       * If the user has not changed the run schedule, set the schedule received from the
-       * server.
-       * 
-       * Note:- If the scedule received from server is less than minRunSchedule, set it to
-       * defaultRunSchedule.
-       */
-      var runScheduleFromServer = status.motorState.runSchedule - status.motorState.runTime;
-      if ( runScheduleFromServer > minRunSchedule) {
-        runSchedule = status.motorState.runSchedule - status.motorState.runTime;
-      } else {
-        runSchedule = defaultRunSchedule;
-      }
+    if (this.state.systemStatus.motorState.state === Status.ON ||  !this.state.runScheduleModified) {
+      /* If the user has not changed the run schedule, set the schedule received from the
+      * server.
+      */ 
+      runSchedule = this.getRunSchedule(status);
     }
     this.setState(
       {
@@ -297,7 +300,9 @@ export default class MeasureScrn extends React.Component {
       });
       Motor.turnOff()
         .then(() => {
+          var runSchedule = this.getRunSchedule(this.state.systemStatus);
           this.startSystemStatusUpdate();
+
           this.setState(
             {
               systemStatus: {
@@ -306,8 +311,10 @@ export default class MeasureScrn extends React.Component {
                 {
                   ...this.state.systemStatus.motorState,
                   state: Status.OFF
-                }
+                },
+                runSchedule
               },
+              runScheduleModified: false,
               showProgressModal: false,
               progressMessage: null,
             },
@@ -343,7 +350,6 @@ export default class MeasureScrn extends React.Component {
   }
   getDurationDisplayText(duration) {
     let hours = parseInt(duration / 60);
-    console.log('hours = ', hours);
     let minutes = duration - (hours * 60);
     let displayText = "";
     if (hours > 0) {
