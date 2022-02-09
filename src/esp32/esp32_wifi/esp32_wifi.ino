@@ -117,13 +117,17 @@ typedef struct __SystemStatus {
 SystemStatus sysStatus;
 HTTPClient http;
 HTTPClient firebaseHttpStream;
-WiFiClient *firebaseStreamSocket;
+WiFiClient *firebaseStreamSocket = NULL;
 TaskHandle_t firebaseStreamTaskHandle;
 
 unsigned long lastWifiReconnectTime = 0;
 unsigned long lastSystemUpdateReqTimestamp = 0;
 unsigned long lastSystemStatusUpdateTime = 0;
 unsigned long lastFStreamKeepAliveTime = 0;
+unsigned long lastStatusCheckTime = 0;
+
+String firebaseEvent;
+String firebaseData;
 
 String getUrl(String path) {
   String url = "";
@@ -170,17 +174,16 @@ void firebaseStreamCallback(String &event, String &data)
         data = root["data"].as<String>();
       }
     }
-
     unsigned long currentMillis = millis();
     lastFStreamKeepAliveTime = currentMillis;
 
     event.toLowerCase();
 
-    debugPrint(INFO, "Stream Event:");
+    debugPrint(INFO, "Event:");
     debugPrintln(NONE, event);
 
     if (event == "put") {
-      debugPrint(INFO, "Stream Event Path:");
+      debugPrint(INFO, "Path:");
       debugPrintln(NONE, path);
       debugPrintln(NONE, data);
 
@@ -233,6 +236,45 @@ void initFirebaseStream() {
         firebaseStreamTaskHandle = NULL;
     }, "FirebaseStream_Task", FIREBASE_STREAM_STACK_SIZE, NULL, 3, &firebaseStreamTaskHandle, ARDUINO_RUNNING_CORE);
     return;
+}
+void checkFirebaseStream() {
+  short retryCount = 0;
+retry:
+    if (retryCount > 5) {
+      return;
+    }
+  if (!firebaseHttpStream.connected()) {
+      firebaseHttpStream.end();
+      firebaseHttpStream.begin(getUrl(CMD_URL));
+      firebaseHttpStream.setTimeout(5000);
+      firebaseHttpStream.addHeader("Accept", "text/event-stream");
+      int httpCode = firebaseHttpStream.GET();
+      if (httpCode != HTTP_CODE_OK) {
+          Serial.println("Error !, Firebase stream fail: " + String(httpCode));
+          delay(5000);
+          retryCount++;
+          goto retry;
+      }
+      firebaseStreamSocket = firebaseHttpStream.getStreamPtr();
+  }
+  
+  if (!firebaseStreamSocket) {
+    retryCount++;
+    goto retry;
+  }
+  
+  if (firebaseStreamSocket->available()) {
+      String line = firebaseStreamSocket->readStringUntil('\n');
+      if (line.startsWith("event:")) {
+          firebaseEvent = line.substring(7, line.length());
+          firebaseEvent.trim();
+      } else if (line.startsWith("data:")) {
+          firebaseData = line.substring(6, line.length());
+          firebaseData.trim();
+      } else if (line.length() == 0) {
+          firebaseStreamCallback(firebaseEvent, firebaseData);
+      }
+  }
 }
 
 void stopFirebaseStream() {
@@ -324,6 +366,8 @@ bool postToFirebase( const String & path , const String & data) {
     result = true;
   }
   http.end();
+  delay(50);
+
   return result;
 }
 void prepareMotorStart(const String &strCmd){
@@ -356,7 +400,8 @@ void updateSystemStatus(){
         "\"durationInThisState\":<durationInThisState>"
     "},"
     "\"powerState\":<powerState>,"
-    "\"timestamp\":{\".sv\":\"timestamp\"}"
+    "\"timestamp\":{\".sv\":\"timestamp\"},"
+    "\"heap\":<heap>"
   "}";
 
   jsonData.replace("<runTime>",String(sysStatus.motor.runTime));
@@ -364,6 +409,7 @@ void updateSystemStatus(){
   jsonData.replace("<motorState>",String(sysStatus.motor.motorState.state));
   jsonData.replace("<durationInThisState>",String(sysStatus.motor.motorState.durationInThisState));
   jsonData.replace("<powerState>",String(sysStatus.power.state));
+  jsonData.replace("<heap>",String(ESP.getFreeHeap()));
 
   if (postToFirebase(SYS_STATUS_URL, jsonData)) {
     lastSystemStatusUpdateTime = millis();
@@ -379,7 +425,10 @@ void turnOnMotor(){
   sysStatus.motor.motorState.motorStateChangeTime = millis();
 
   digitalWrite(RELAY, LOW);
+  delay(50);
+
   updateSystemStatus();
+
   String jsonData = "{"
       "\"request\":\"\","
       "\"response\":\"turnedon\","
@@ -398,7 +447,10 @@ void turnOffMotor(){
   sysStatus.motor.motorState.motorStateChangeTime = millis();
 
   digitalWrite(RELAY,HIGH);
+  delay(50);
+
   updateSystemStatus();    
+
   String jsonData = "{"
       "\"request\":\"\","
       "\"response\":\"stopped\","
@@ -526,8 +578,8 @@ void initializeSystemStatus() {
     if (root.success()) {
       if (root.containsKey("motorState")) {
         JsonObject &motorState = root["motorState"].as<JsonObject>();
-        sysStatus.motor.runSchedule = motorState["runTime"].as<unsigned short>();
-        sysStatus.motor.runTime = motorState["runSchedule"].as<unsigned short>();
+        sysStatus.motor.runSchedule = motorState["runSchedule"].as<unsigned short>();
+        sysStatus.motor.runTime = motorState["runTime"].as<unsigned short>();
         debugPrint(INFO, "motor.runSchedule = ");
         debugPrintln(NONE, sysStatus.motor.runSchedule);
         debugPrint(INFO, "motor.runTime = ");
@@ -547,7 +599,6 @@ void setup() {
 
   sysStatus.motor.motorState.state = OFF;
   sysStatus.power.state = ON;
-
   //Wait for 70 seconds for wifi to be available
   /* debugPrintln(INFO, "Waiting for 90 seconds for wifi to be available...");
   while (count-- > 0) {
@@ -594,7 +645,7 @@ void setup() {
    * otherwise stream will be called unnecessarily for the above 
    * firebase update.
    */
-  initFirebaseStream();
+  //initFirebaseStream();
 
   String startupData = "{"
       "\"timestamp\":{\".sv\":\"timestamp\"}"
@@ -681,7 +732,7 @@ void checkStatus()
       }
       debugPrintln(INFO, "Success.");
       initHttpClient();
-      initFirebaseStream();
+      //initFirebaseStream();
     }
     lastWifiReconnectTime = millis();
     lastFStreamKeepAliveTime = lastWifiReconnectTime;
@@ -726,15 +777,22 @@ void updateLocalSystemStatus() {
   }
 
 }
-void loop() {
-  unsigned long currentMillis = millis();
+void statusCheck() {
   checkStatus();
   updateLocalSystemStatus();
-  delay(3000);
   debugPrint(INFO, "Heap = ");
   debugPrintln(NONE, (long)ESP.getFreeHeap());
   if (ESP.getFreeHeap() < HEAP_MIN_THRESHOLD) {
     debugPrintln(INFO, "Heap is low. Restarting.. ");
     ESP.restart();
   }
+}
+void loop() {
+  unsigned long currentMillis = millis();
+  if ((currentMillis - lastStatusCheckTime) > 10000) {
+    statusCheck();
+    lastStatusCheckTime = currentMillis;
+  }
+  checkFirebaseStream();
+  delay(5);
 }
