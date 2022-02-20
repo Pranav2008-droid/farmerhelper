@@ -442,13 +442,19 @@ void turnOffMotor(){
   if (sysStatus.motor.motorState.state == OFF) {
     debugPrintln(INFO, "Motor is already off");
   }
+  /*
+   * Workaround to address hang issue. Restart ESP32 while stopping.
+   */
+  ESP.restart();
+  return ;
+
   sysStatus.motor.motorState.state = OFF;
   sysStatus.motor.motorState.durationInThisState = 0;
   sysStatus.motor.motorState.motorStateChangeTime = millis();
 
   digitalWrite(RELAY,HIGH);
   delay(50);
-
+  
   updateSystemStatus();    
 
   String jsonData = "{"

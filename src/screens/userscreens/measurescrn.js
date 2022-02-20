@@ -14,7 +14,7 @@ var Types = require('../../common/types');
 var Status = Types.Status;
 const minRunSchedule = 10;
 const defaultRunSchedule = 30;
-const maxRunSchedule = 120;
+const maxRunSchedule = 150;
 export default class MeasureScrn extends React.Component {
   constructor() {
     super();
